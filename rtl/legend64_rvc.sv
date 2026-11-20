@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // legend64_rvc: expands a 16-bit RV64C instruction into its 32-bit equivalent.
 // Reserved and illegal encodings set `illegal`; the caller then traps with the 16 raw bits.
 module legend64_rvc (

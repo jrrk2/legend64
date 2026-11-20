@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
 # Runs INSIDE the riscv64 Debian tree as PID 1 (kernel option
 # init=/legend64-second-stage.sh), either under QEMU (second-stage-qemu.sh) or on
 # the board itself.  Finishes debootstrap, then applies the legend64 settings.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // legend_plic: platform-level interrupt controller with the standard (SiFive) register layout,
 // for one hart with a machine context (0) and a supervisor context (1).
 //   0x000000 + 4*n  priority of source n            0x001000  pending bits

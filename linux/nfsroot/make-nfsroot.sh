@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # ============================================================================
 #  RUN AS ROOT (sudo ./make-nfsroot.sh) - not run by the build automation.
 # ============================================================================

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Run the legend64 kernel on QEMU "virt", with the CPU cut down to what the
 # real hardware has (as far as QEMU allows).
 #

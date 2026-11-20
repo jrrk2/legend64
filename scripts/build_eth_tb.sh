@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Build and run the unit test of the Ethernet MAC front end (fpga/tb/tb_eth.sv):
 #   build_eth_tb.sh              the normal build, three runs
 #   build_eth_tb.sh small        with a small receive FIFO, so that it overflows

@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
 # legend64 bring-up initramfs: Debian busybox-static, nothing else.
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin
 /bin/busybox mount -t devtmpfs devtmpfs /dev

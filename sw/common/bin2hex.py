@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Convert a flat little-endian binary into one hex word per line for $readmemh.
 
 usage: bin2hex.py <in.bin> <out.hex> [bytes_per_word=4]

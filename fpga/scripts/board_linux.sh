@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Boot Linux on the shared VC707: JTAG-load the bitstream, send OpenSBI, the kernel, the device
 # tree and the initramfs through the monitor's UDP loader, then drive the shell over serial.
 # Must run under the board lock:

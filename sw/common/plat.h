@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 #ifndef PLAT_H
 #define PLAT_H
 // Testbench devices and counters. The console is at the same address on every platform.

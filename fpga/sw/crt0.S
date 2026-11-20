@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Reset entry of the VC707 boot monitor (boot memory at 0x0001_0000).
 	.section .text.init, "ax"
 	.global _start

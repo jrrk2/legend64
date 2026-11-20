@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Stand-in for the boot monitor when simulating a Linux boot: the testbench has already put
 // the firmware, kernel and device tree in memory, so just enter the firmware the way the
 // monitor's loader would (a0 = hart 0, a1 = device tree).

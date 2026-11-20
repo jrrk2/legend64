@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # legend64 kernel configuration fragment.
 # This is the human-maintained source of kernel/legend64_defconfig:
 #   make ARCH=riscv allnoconfig KCONFIG_ALLCONFIG=legend64.fragment ; make savedefconfig

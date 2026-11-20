@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Drive a serial console on stdio non-interactively (a tiny 'expect').
 
   qemu-drive.py [--timeout SECS] [--log FILE] STEP... -- command [args...]

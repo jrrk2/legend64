@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Shared startup for all four cores (PicoRV32, Ibex and the two new cores).
 // 0x00..0x7c: trap/interrupt vector slots (Ibex-style vectored mtvec at boot_addr)
 // 0x80: reset entry (Ibex boot_addr + 0x80; PicoRV32 PROGADDR_RESET = 0x80)

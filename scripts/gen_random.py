@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Generate a random self-terminating RV32IM program as a $readmemh image.
 
 usage: gen_random.py <seed> <out.hex> [n_instructions]

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // CPU hooks LiteX software expects. legend64's cache needs no maintenance: the memory tests
 // used here are larger than the cache or go through the controller's command registers.
 #pragma once

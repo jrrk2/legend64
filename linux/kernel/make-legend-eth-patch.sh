@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Turn a single driver source file into kernel/patches/legend-eth.patch, the
 # patch that build-kernel.sh applies automatically.
 #

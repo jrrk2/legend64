@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Boot Linux on the shared VC707 with its root on NFS: JTAG-load the bitstream, send OpenSBI, the
 # kernel and the NFS-root device tree through the monitor's UDP loader, then log the console until
 # a login prompt appears (or the time limit, default 480 s).

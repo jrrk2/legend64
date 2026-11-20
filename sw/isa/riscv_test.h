@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Bare-metal environment for the upstream riscv-tests ISA suite on the shared testbench:
 // pass = write 0 to the exit device, fail = write the failing test number.
 #ifndef RISCV_TEST_H

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Boot Linux on the shared VC707 with its root on NFS, leaving the serial port alone so the console
 # can be watched in a terminal program (picocom -b 115200 /dev/ttyUSB0). JTAG-loads the bitstream,
 # waits for the monitor to answer ping, sends OpenSBI, the kernel and the NFS-root device tree, then

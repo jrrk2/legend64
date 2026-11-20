@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Send images to the legend64 boot monitor over UDP and start them.
 
 usage: netload.py [--ip 192.168.1.51] <file>@<hex address> ... [--jump <hex address> [--arg <hex value>]]

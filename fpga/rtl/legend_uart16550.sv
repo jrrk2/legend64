@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // legend_uart16550: the subset of a 16550A that Linux's 8250 driver and OpenSBI use.
 // Byte-wide registers at offsets 0..7. The line always runs 8N1 at BAUD, derived from the
 // system clock by a fractional divider: the divisor latch is stored and read back but has no

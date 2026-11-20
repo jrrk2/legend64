@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Boot monitor image for the VC707 build: build/fpga/boot.hex (64-bit words for $readmemh).
 ROOT := $(abspath ../..)
 P    := $(ROOT)/tools/root/usr/bin/riscv64-unknown-elf-

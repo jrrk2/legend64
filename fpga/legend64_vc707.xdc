@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # legend64 on the VC707. The DDR3 pins and the 200 MHz system clock (sys_clk_p/n) are constrained
 # by the memory interface's own XDC. This file is Tcl (read with read_xdc -unmanaged).
 set_property CFGBVS GND [current_design]

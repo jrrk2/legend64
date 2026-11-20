@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Random lockstep campaign: random_pico.sh <first_seed> <count>. Each seed runs with both memory models.
 cd "$(dirname "$0")/.."
 mkdir -p build/rand

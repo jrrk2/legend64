@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Unit testbench for legend64_fpu: replays reference vectors (scripts/fpu_vectors.c) and compares
 // the result and exception flags of every operation.
 `timescale 1ns / 1ps

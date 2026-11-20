@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Startup for legend64: reset entry at 0x8000_0000, exit through the HTIF-style tohost word.
 	.section .text.init, "ax"
 	.global _start

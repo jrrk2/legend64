@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Build the two PicoRV32-interface simulators: build/sim/pico_ref (PicoRV32) and build/sim/pico_dut (pico_legend).
 set -e
 cd "$(dirname "$0")/.."

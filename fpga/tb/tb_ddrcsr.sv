@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Simulation of the LiteDRAM start-up path without a LiteDRAM: the full boot monitor runs
 // LiteX's sdram_init() against a register file that simply stores what is written. Levelling
 // cannot succeed, but every controller-register access goes through the SoC's stalled

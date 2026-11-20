@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Generate the DDR3 memory interface for the VC707 from the board preset, with two changes:
 # the native user interface instead of AXI, and the extra MMCM outputs set to the system
 # clock (800 MHz / SYS_DIV) and the 100 MHz MAC clock.

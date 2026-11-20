@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Regenerate the LiteDRAM core: fpga/litedram/build/gateware/litedram_core.v and the CSR headers.
 set -e
 cd "$(dirname "$0")"

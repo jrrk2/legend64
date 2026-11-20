@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // pico_legend: an RV32IM core that plugs into the PicoRV32 native memory interface.
 //
 // Designed from the PicoRV32 interface description, not derived from its RTL. Where PicoRV32

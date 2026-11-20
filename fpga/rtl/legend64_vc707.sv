@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // legend64_vc707: legend64 on the Xilinx VC707 with 1 GiB of DDR3 and SGMII Ethernet.
 //
 //   200 MHz board clock -> Xilinx memory interface (DDR3-1600, 200 MHz user clock)

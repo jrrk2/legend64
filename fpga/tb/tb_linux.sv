@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Boots real firmware and a real kernel on the simulated SoC. The DDR3 controller is replaced
 // by a behavioural line memory that is preloaded with the images; a small reset stub in the
 // boot memory jumps to the firmware. Console output is printed as it appears.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Simulation of legend64_soc with a behavioural line memory in place of the DDR3 controller and
 // a scripted Ethernet peer in place of the MAC. Prints what the monitor writes to the UART.
 //

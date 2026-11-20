@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Compare a legend64 run with QEMU, instruction by instruction.
 
 usage: lockstep_qemu.py <test.elf> [--keep]

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Load a bitstream on the shared VC707 and exercise it: boot log, status, ping.
 # Must run under the board lock:
 #   ~/synthgui-work/mapper-bisect/board-run.sh rv64g "<purpose>" -- fpga/scripts/board_boot.sh <bitstream>

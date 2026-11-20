@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Build out/initramfs.cpio.gz from Debian's unmodified riscv64 busybox-static.
 # No root needed (the only device node, /dev/console, comes from devtmpfs,
 # which /init mounts itself).

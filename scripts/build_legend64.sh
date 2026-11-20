@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Build the legend64 simulator: build/sim/legend64
 set -e
 cd "$(dirname "$0")/.."

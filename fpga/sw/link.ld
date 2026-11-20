@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: Apache-2.0 */
 OUTPUT_ARCH(riscv)
 ENTRY(_start)
 MEMORY { boot (rwx) : ORIGIN = 0x10000, LENGTH = 0x10000 }

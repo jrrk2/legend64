@@ -1,0 +1,59 @@
+legend64
+Copyright 2026 Jonathan Kimmitt
+
+An RV64GC processor core, a system-on-chip around it for the Xilinx VC707 board, and the
+software to run Debian on it. Designed and written with Claude (Anthropic).
+
+Unless a file says otherwise, this work is licensed under the Apache License, Version 2.0
+(see LICENSE). Files carry an SPDX-License-Identifier line.
+
+Parts under other terms
+-----------------------
+
+linux/drivers/legend_eth.c, linux/kernel/patches/
+    The Ethernet driver for the Linux kernel and the patch that adds it: GPL-2.0, as a part of
+    the kernel must be.
+
+linux/dts/legend64-vc707.dts
+    Dual licensed, GPL-2.0-only or MIT, as is usual for device trees.
+
+Third-party material in this repository
+---------------------------------------
+
+sw/coremark/
+    CoreMark, Copyright 2018 Embedded Microprocessor Benchmark Consortium (EEMBC).
+    Apache License 2.0, together with EEMBC's CoreMark acceptable use terms
+    (https://www.eembc.org/coremark/). core_portme.c and core_portme.h are this project's
+    port of it.
+
+sw/dhrystone/
+    Dhrystone 2.1 by Reinhold P. Weicker (C version by Rick Richardson), as distributed with
+    PicoRV32. The benchmark carries no licence statement; it has been freely redistributed
+    since 1988. stdlib.c, the small C library beside it, is public domain (the Unlicense).
+
+fpga/litedram/build/
+    Output of LiteDRAM's standalone core generator for the configuration in
+    fpga/litedram/vc707.yml: the DDR3 controller and PHY (litedram_core.v) and the register
+    headers its initialisation software needs. LiteX and LiteDRAM are Copyright EnjoyDigital
+    and contributors, BSD 2-Clause (https://github.com/enjoy-digital/litex,
+    https://github.com/enjoy-digital/litedram).
+
+fpga/litedram/vc707_ddr3_pins.xdc
+    The VC707's DDR3 pin assignments and I/O standards, taken from the constraints Xilinx's
+    Memory Interface Generator writes for this board.
+
+Third-party material used when building, not included here
+----------------------------------------------------------
+
+A bitstream or boot image built from this repository also contains or runs:
+
+    eth_mac_1g, axis_gmii_rx, axis_gmii_tx, lfsr    Alex Forencich, verilog-ethernet, MIT
+    LiteEth SGMII PHY (1000BASE-X PCS, GTX wrapper)  EnjoyDigital and contributors, BSD 2-Clause
+    liblitedram (DDR3 initialisation and levelling,  EnjoyDigital and contributors, BSD 2-Clause
+      linked into the boot monitor)
+    OpenSBI                                          Western Digital and contributors, BSD 2-Clause
+    Linux kernel                                     GPL-2.0
+    BusyBox (initramfs)                              GPL-2.0
+
+The ISA tests run by scripts/isa_legend64.sh are the upstream riscv-tests (BSD 3-Clause), and
+scripts/lockstep_qemu.py compares the core with QEMU (GPL-2.0); neither is included.

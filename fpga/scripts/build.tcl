@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Synthesise, place, route and write the bitstream for legend64 on the VC707 (Vivado 2020.1).
 # usage: vivado -mode batch -source build.tcl -tclargs <riscv_root> <out_dir> <sys_div> <clk_hz> <build_id_hex> [mig|litedram]
 #        [cache_lines_log2 (10 = 64 KiB)] [tlb_entries (8)] [threads (8)]

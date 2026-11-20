@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # ============================================================================
 #  RUN AS ROOT for the real tree (sudo ./second-stage-qemu.sh).
 #  (It also runs unprivileged on a fakeroot-made rehearsal tree with

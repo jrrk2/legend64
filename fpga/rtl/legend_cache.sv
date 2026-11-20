@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // legend_cache: one direct-mapped cache in front of the DDR3 memory, shared by the instruction
 // and data ports of legend64 so that code written through the data port is what gets fetched.
 //

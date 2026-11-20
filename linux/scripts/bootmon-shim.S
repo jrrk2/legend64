@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /* Stand-in for the board's boot monitor, used only for the QEMU rehearsal of
  * the board boot flow: enter OpenSBI fw_jump at 0x80000000 in M-mode with
  * a0 = 0 (hart id) and a1 = address of the DTB the monitor loaded. */

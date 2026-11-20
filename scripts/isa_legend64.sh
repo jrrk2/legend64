@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Run ISA tests on legend64. usage: isa_legend64.sh [-v] [extra plusargs, e.g. +jitter]
 #   default: the machine-level "p" environment images; -v: the virtual-memory "v" environment images
 cd "$(dirname "$0")/.."

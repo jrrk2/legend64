@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // What LiteX's liblitedram (sdram.c, accessors.c) needs from its surroundings, provided by the
 // legend64 boot monitor: formatted output, the post-levelling memory test, and delays.
 #include <stdint.h>

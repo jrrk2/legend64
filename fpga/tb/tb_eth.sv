@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Unit test of legend_eth against a byte-array memory and scripted MAC streams.
 // Transmit: random frames of one to four descriptors at random byte alignments, with and without
 // checksum insertion, some too long (to be discarded); the bytes that come out are compared

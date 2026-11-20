@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Keep the shared VC707 for <minutes> (default 30) without reloading it, logging a ping to the
 # running system every 10 s: for when someone is working on its console.
 #   ~/synthgui-work/mapper-bisect/board-run.sh rv64g "<purpose>" -- fpga/scripts/board_hold.sh [minutes]

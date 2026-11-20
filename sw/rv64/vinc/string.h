@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Minimal <string.h> for building the riscv-tests "v" environment without a C library.
 #ifndef LEGEND_STRING_H
 #define LEGEND_STRING_H

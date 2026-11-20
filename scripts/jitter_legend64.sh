@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # For every ISA test, check the retirement trace is identical with and without bus jitter.
 # The run ends a few cycles after the tohost write, so one trace may be a few lines longer;
 # the shorter must be an exact prefix of the longer.

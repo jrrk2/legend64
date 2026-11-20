@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Compile the board device trees into out/.  No root needed.
 #   out/legend64-vc707.dtb            NFS root (the default bootargs in the .dts)
 #   out/legend64-vc707-initramfs.dtb  boots out/initramfs.cpio.gz preloaded at INITRD_ADDR

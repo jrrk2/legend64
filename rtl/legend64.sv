@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // legend64: an RV64GC core (RV64IMAFDC + Zicsr + Zifencei) with machine, supervisor and user
 // modes and Sv39 virtual memory.
 //

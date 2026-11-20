@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Minimal <stdio.h> for building LiteX's liblitedram into the legend64 boot monitor.
 #pragma once
 #include <stddef.h>

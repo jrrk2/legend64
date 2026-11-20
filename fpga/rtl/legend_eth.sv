@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // legend_eth: descriptor-ring Ethernet MAC front end that moves packets by DMA through the
 // coherent device port of the CPU's cache (legend_cache). The byte-stream MAC, PCS and PHY
 // below it are synthgui's (eth_mac_1g and LiteEth's SGMII PHY, in legend_sgmii); this module sits

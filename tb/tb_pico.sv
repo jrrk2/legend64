@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Testbench shared by PicoRV32 (reference, -DREF) and pico_legend on the native memory interface.
 //
 // Memory model: by default the look-ahead model from PicoRV32's own dhrystone/testbench.v

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Builds the benchmark and ISA-test images. ARCH=rv32im for the PicoRV32-class cores,
 # ARCH=rv32imc for the Ibex-class cores.
 ARCH ?= rv32im

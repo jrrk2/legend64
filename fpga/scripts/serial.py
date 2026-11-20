@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Talk to the legend64 boot monitor on the VC707 UART (/dev/ttyUSB0, 115200 8N1).
 
 usage: serial.py capture <seconds> [keys]         print what arrives; optional keys are sent after 1 s

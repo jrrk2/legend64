@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Boot monitor for legend64 on the VC707. Runs in machine mode from block RAM.
 //
 // It checks the DDR3 memory and the FPU, brings up the Ethernet MAC, answers ARP and ping, and

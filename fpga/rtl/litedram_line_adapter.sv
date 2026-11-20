@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // litedram_line_adapter: the cache's line handshake and the SoC's controller-register handshake
 // onto a LiteDRAM core's native user port (512-bit data: one cache line per command) and its
 // Wishbone control port. Runs on the controller's clock; both requests come from the system

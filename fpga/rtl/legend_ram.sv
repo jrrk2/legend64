@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Inferred block RAMs used by the VC707 system.
 
 // Two read ports, byte-enabled write on port B, one clock. Port B reads the old contents

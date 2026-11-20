@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Build a simulator of the SoC: build_soc_sim.sh <testbench.sv> <output name>
 set -e
 cd "$(dirname "$0")/.."

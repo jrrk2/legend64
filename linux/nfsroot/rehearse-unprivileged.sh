@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Unprivileged rehearsal of the Debian root procedure (NO root needed; this is
 # what was actually run - see logs/rehearsal-*.log).  It differs from the real
 # procedure only where root is unavoidable:

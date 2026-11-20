@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Build the legend64 kernel: mainline linux-6.18.64, unmodified source,
 # config kernel/legend64_defconfig.  No root needed.
 #

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // legend_sgmii: the SGMII PHY/PCS (LiteEth's, from synthgui's vc707_ethmin project) and the
 // byte-stream MAC (eth_mac_1g), with the MAC's two halves running directly on the PCS's own
 // receive and transmit clocks.

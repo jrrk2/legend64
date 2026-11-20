@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Testbench for legend64: 16 MB of RAM at 0x8000_0000, console at 0x1000_0000, HTIF-style
 // tohost at 0x8000_1000 (as laid out by the riscv-tests linker script), and a CLINT-style
 // timer (msip 0x0200_0000, mtimecmp 0x0200_4000, mtime 0x0200_bff8).

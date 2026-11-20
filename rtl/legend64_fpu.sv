@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // legend64_fpu: IEEE 754 single and double precision unit for the F and D extensions.
 //
 // Multi-cycle and unpipelined: the core holds the instruction and its operands steady from

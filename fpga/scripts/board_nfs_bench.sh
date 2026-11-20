@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Network benchmark of the Debian NFS-root system on the shared VC707: JTAG-load the bitstream,
 # send OpenSBI, the kernel and the NFS-root device tree, wait for the system's SSH server, and
 # over SSH (as the invoking user, by key) run iperf3 each way against this host, check 8 MB of

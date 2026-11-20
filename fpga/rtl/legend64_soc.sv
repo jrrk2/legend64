@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // legend64_soc: the legend64 core with its boot memory, DDR cache and peripherals. Everything
 // here runs on the system clock except the far side of the Ethernet packet FIFOs.
 //

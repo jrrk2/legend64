@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // mig_line_adapter: turns the cache's line handshake into commands on the user interface of
 // the Xilinx 7-series memory interface (4:1 mode, 64-bit DDR3: one 512-bit word per burst).
 // Runs on ui_clk; the request comes from another clock domain and is synchronised here.

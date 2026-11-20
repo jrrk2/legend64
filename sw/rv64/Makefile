@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # RV64G images for legend64: the upstream riscv-tests ISA suite (standard "p" environment)
 # and the benchmarks. Outputs go to build/sw/rv64/.
 ROOT := $(abspath ../..)

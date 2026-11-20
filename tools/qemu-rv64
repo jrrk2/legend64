@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # QEMU for RISC-V from the Ubuntu packages unpacked under tools/qemu (no system install).
 here=$(cd "$(dirname "$0")" && pwd)
 export LD_LIBRARY_PATH=$here/qemu/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
