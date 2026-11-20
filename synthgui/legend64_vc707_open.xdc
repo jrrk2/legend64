@@ -624,7 +624,7 @@ create_clock -name sys_clk_p -period 5.0 [get_ports sys_clk_p]
 create_clock -name sgmii_refclk_p -period 8.0 [get_ports sgmii_refclk_p]
 create_clock -name eth_tx_clk -period 8.0 [get_nets eth_tx_clk]
 create_clock -name eth_rx_clk -period 8.0 [get_nets eth_rx_clk]
-create_clock -name clk_sys -period 80.000 [get_nets clk_sys]
+create_clock -name clk_sys -period 40.000 [get_nets clk_sys]
 create_clock -name eth_txout -period 16.0 [get_nets u_eth.i_phy.k7_1000basex_s7mmcm0_clkin_signal]
 create_clock -name eth_rxout -period 16.0 [get_nets u_eth.i_phy.k7_1000basex_rxoutclk_rebuffer]
 set_clock_groups -group [get_clocks -of [get_nets eth_tx_clk]] -group [get_clocks -of [get_nets eth_rx_clk]] -asynchronous

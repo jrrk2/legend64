@@ -12,6 +12,14 @@ Roughly in priority order within each section. Measurements are from the VC707 a
   reserve kernel with a small root for when the network is away. The read-only JFFS2 reader is
   written and tested on the host (`scripts/test_jffs2.sh`); the monitor does not use it yet and
   the partition is blank.
+- **Open flow at 25 MHz:** with the mapper's timing-driven passes and its own constraint file
+  (`synthgui/legend64_vc707_synth.sdc`) the core clock routes at 27.2 MHz against a 25 MHz
+  target (23.5 MHz before, untargeted); every clock passes. Bitstream
+  `build/synthgui/legend64_vc707_25m_timing.bit`, not yet run on the board (it needs a device
+  tree built with `TIMEBASE_HZ=25000000`). More passes or other ABC scripts do not move it: the
+  routed critical path (instruction register to `m_val`) is 42 LUTs, 33 carry stages and 11
+  wide-function muxes deep, and 73 % of its 36.7 ns is routing. The mapper's estimate also
+  charges 0.15 ns of net delay per carry-chain link, which a routed chain does not have.
 - **Timing margin:** the build with the flash bridge closes at +0.056 ns.
 
 ## Done recently
@@ -78,7 +86,7 @@ Roughly in priority order within each section. Measurements are from the VC707 a
 - Move the NFS export to `/srv/nfs/legend64` and set the hostname inside the tree (needs root on
   the host), then update `nfsroot=` in `linux/dts/legend64-vc707.dts`.
 - Writing the flash from Linux needs `mtd-utils` in the NFS tree and root on the board.
-- The open flow leaves the flash pins and ICAPE2 out (`make_project.py` has not been taught them).
+- The open flow has the flash bridge and its pins but not ICAPE2 (`RECONFIG=0`): `reboot` hangs there.
 - Serial password login times out; probably the 6.7 s yescrypt hash plus slow start-up, unconfirmed.
 - Decide whether `third_party/synthgui` stays a submodule or its five source files are copied in.
 - Rename the working directory `~/riscv` when nothing is running in it.
