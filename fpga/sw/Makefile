@@ -4,8 +4,8 @@ ROOT := $(abspath ../..)
 P    := $(ROOT)/tools/root/usr/bin/riscv64-unknown-elf-
 OUT  := $(ROOT)/build/fpga
 # The DDR3 initialisation and levelling for LiteDRAM builds is LiteX's own liblitedram, compiled
-# from the installed LiteX sources against the headers generated with the core (fpga/litedram).
-LXSW   := $(firstword $(wildcard $(ROOT)/tools/litex/venv/lib/python3*/site-packages/litex/soc/software))
+# from the LiteX submodule against the headers generated with the core (fpga/litedram).
+LXSW   := $(ROOT)/third_party/litex/litex/soc/software
 GCCINC := $(shell $(P)gcc -print-file-name=include)
 DDR_CFLAGS := -march=rv64gc -mabi=lp64d -mcmodel=medany -Os -ffreestanding -fno-builtin -nostdinc -isystem $(GCCINC) \
 	-ffunction-sections -fdata-sections -Iddr/shim -I$(ROOT)/fpga/litedram/build/software/include -I$(LXSW)/include \

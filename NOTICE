@@ -42,18 +42,22 @@ fpga/litedram/vc707_ddr3_pins.xdc
     The VC707's DDR3 pin assignments and I/O standards, taken from the constraints Xilinx's
     Memory Interface Generator writes for this board.
 
-Third-party material used when building, not included here
-----------------------------------------------------------
+Third-party material used when building
+---------------------------------------
 
-A bitstream or boot image built from this repository also contains or runs:
+Submodules under third_party/ and ref/ (see README.md), each under its own licence. A bitstream
+or boot image built from this repository contains or runs:
 
     eth_mac_1g, axis_gmii_rx, axis_gmii_tx, lfsr    Alex Forencich, verilog-ethernet, MIT
+      (as carried in third_party/synthgui)
     LiteEth SGMII PHY (1000BASE-X PCS, GTX wrapper)  EnjoyDigital and contributors, BSD 2-Clause
+      (generated; as carried in third_party/synthgui)
     liblitedram (DDR3 initialisation and levelling,  EnjoyDigital and contributors, BSD 2-Clause
-      linked into the boot monitor)
-    OpenSBI                                          Western Digital and contributors, BSD 2-Clause
-    Linux kernel                                     GPL-2.0
-    BusyBox (initramfs)                              GPL-2.0
+      linked into the boot monitor; third_party/litex)
+    OpenSBI (third_party/opensbi)                    Western Digital and contributors, BSD 2-Clause
+    Linux kernel (downloaded by the build)           GPL-2.0
+    BusyBox (initramfs; not included)                GPL-2.0
 
-The ISA tests run by scripts/isa_legend64.sh are the upstream riscv-tests (BSD 3-Clause), and
-scripts/lockstep_qemu.py compares the core with QEMU (GPL-2.0); neither is included.
+The ISA tests run by scripts/isa_legend64.sh are the upstream riscv-tests (ref/riscv-tests,
+BSD 3-Clause); ref/picorv32 is ISC. scripts/lockstep_qemu.py compares the core with QEMU
+(GPL-2.0), which is not included.

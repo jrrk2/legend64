@@ -1,7 +1,6 @@
 # everything built, downloaded or installed locally
 /build/
 /build25.log
-/ref/
 /tools/*
 !/tools/qemu-rv64
 /linux/dl/
@@ -17,3 +16,4 @@
 /fpga/litedram/build/litex.log
 __pycache__/
 *.pyc
+/linux/opensbi-build/

@@ -25,7 +25,7 @@ verified" at the end).
 | `tools/` | cross compiler etc. unpacked from Ubuntu packages (`tools/debs`), `dl/` downloads |
 
 OpenSBI is not rebuilt: the stock Ubuntu `opensbi` 1.8.1 binary
-`/home/jonathan/riscv/tools/qemu/usr/lib/riscv64-linux-gnu/opensbi/generic/fw_jump.bin`
+`out/fw_jump.bin`
 is used as is.
 
 ## Hardware contract assumed
@@ -51,7 +51,7 @@ Network: board 192.168.1.51, NFS server (this host) 192.168.1.176, netmask
 
 | File | Size (bytes) | Load address |
 |---|---|---|
-| `/home/jonathan/riscv/tools/qemu/usr/lib/riscv64-linux-gnu/opensbi/generic/fw_jump.bin` | 275888 | `0x8000_0000` |
+| `out/fw_jump.bin` | 275888 | `0x8000_0000` |
 | `/home/jonathan/riscv/linux/out/Image` | 6718464 | `0x8020_0000` |
 | `/home/jonathan/riscv/linux/out/legend64-vc707.dtb` (NFS root) **or** `out/legend64-vc707-initramfs.dtb` | 2090 / 2050 | `0x8600_0000` |
 | `/home/jonathan/riscv/linux/out/initramfs.cpio.gz` (only with the initramfs DTB) | 1036696 | `0x8800_0000` |

@@ -28,7 +28,7 @@ if [ "$bit" != - ]; then
   for i in $(seq 150); do ping -c 1 -W 1 $B > /dev/null && break; sleep 1; done
   echo "monitor answered ping after ~$i s"
   sleep 2
-  python3 "$here/netload.py" $root/tools/qemu/usr/lib/riscv64-linux-gnu/opensbi/generic/fw_jump.bin@80000000 \
+  python3 "$here/netload.py" $L/fw_jump.bin@80000000 \
       $L/Image@80200000 $dtb@86000000 --jump 80000000 --arg 86000000 2>&1 | tail -1
   t0=$SECONDS
   for i in $(seq 120); do sleep 5; timeout 3 bash -c "echo > /dev/tcp/$B/22" 2>/dev/null && break; done

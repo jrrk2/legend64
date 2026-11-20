@@ -18,7 +18,7 @@ $HOME/synthgui/build-deps/prefix/bin/openFPGALoader --cable digilent --freq 1500
 wait $cap
 echo; echo "--- network load"
 ping -c 2 -W 1 192.168.1.51 > /dev/null
-(sleep 1; python3 "$here/netload.py" $root/tools/qemu/usr/lib/riscv64-linux-gnu/opensbi/generic/fw_jump.bin@80000000 \
+(sleep 1; python3 "$here/netload.py" $L/fw_jump.bin@80000000 \
     $L/Image@80200000 $L/legend64-vc707.dtb@86000000 \
     --jump 80000000 --arg 86000000 1>&2) &
 python3 "$here/serial.py" capture "$limit" --until "login: "

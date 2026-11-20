@@ -12,8 +12,8 @@
 # Environment: CPU=... replaces the CPU model string, MEM=... the RAM size.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
-QEMU=/home/jonathan/riscv/tools/qemu-rv64
-OPENSBI=/home/jonathan/riscv/tools/qemu/usr/lib/riscv64-linux-gnu/opensbi/generic/fw_jump.bin
+QEMU=$here/../tools/qemu-rv64
+OPENSBI=$here/out/fw_jump.bin          # ./build-opensbi.sh
 
 # RV64GC + Sv39 only.  Everything QEMU's "rv64" enables beyond that is off:
 CPU=${CPU:-rv64,sv48=off,sv57=off,pmp=off,sstc=off,h=off,v=off,zba=off,zbb=off,zbc=off,zbs=off,zicbom=off,zicbop=off,zicboz=off,zicntr=off,zihpm=off,pmu-mask=0,zihintpause=off,zihintntl=off,zawrs=off,zfa=off,svadu=off,svade=on,svvptc=off,debug=off}

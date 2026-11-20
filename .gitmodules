@@ -1,0 +1,23 @@
+[submodule "third_party/migen"]
+	path = third_party/migen
+	url = https://github.com/m-labs/migen
+[submodule "third_party/litex"]
+	path = third_party/litex
+	url = https://github.com/enjoy-digital/litex
+[submodule "third_party/litedram"]
+	path = third_party/litedram
+	url = https://github.com/enjoy-digital/litedram
+[submodule "third_party/opensbi"]
+	path = third_party/opensbi
+	url = https://github.com/riscv-software-src/opensbi
+[submodule "ref/riscv-tests"]
+	path = ref/riscv-tests
+	url = https://github.com/riscv-software-src/riscv-tests
+[submodule "ref/picorv32"]
+	path = ref/picorv32
+	url = https://github.com/YosysHQ/picorv32
+[submodule "third_party/synthgui"]
+	path = third_party/synthgui
+	url = https://github.com/jrrk2/synthgui.git
+	branch = vc707-miner
+	shallow = true

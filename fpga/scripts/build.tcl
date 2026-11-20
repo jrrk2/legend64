@@ -10,7 +10,7 @@ if {$cache_log2 eq ""} {set cache_log2 10}
 if {$tlb_entries eq ""} {set tlb_entries 8}
 if {$threads ne ""} {set_param general.maxThreads $threads}
 set litedram [expr {$ddr eq "litedram"}]
-set eth $::env(HOME)/synthgui/projects/vc707_ethmin-src
+set eth $root/third_party/synthgui/projects/vc707_ethmin-src
 file mkdir $out
 create_project -in_memory -part xc7vx485tffg1761-2
 set_property board_part xilinx.com:vc707:part0:1.4 [current_project]

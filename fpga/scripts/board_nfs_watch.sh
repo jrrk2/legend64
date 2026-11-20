@@ -16,7 +16,7 @@ $HOME/synthgui/build-deps/prefix/bin/openFPGALoader --cable digilent --freq 1500
 for i in $(seq 150); do ping -c 1 -W 1 192.168.1.51 > /dev/null && break; sleep 1; done
 echo "monitor answered ping after ~$i s"
 sleep 2
-python3 "$here/netload.py" $root/tools/qemu/usr/lib/riscv64-linux-gnu/opensbi/generic/fw_jump.bin@80000000 \
+python3 "$here/netload.py" $L/fw_jump.bin@80000000 \
     $L/Image@80200000 $L/legend64-vc707.dtb@86000000 --jump 80000000 --arg 86000000 2>&1 | tail -3
 end=$((SECONDS + minutes * 60))
 while [ $SECONDS -lt $end ]; do
