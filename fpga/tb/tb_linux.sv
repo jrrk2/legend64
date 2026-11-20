@@ -13,6 +13,9 @@
 // ports exchanged. To the SoC's TCP that is a simultaneous open with a peer that says exactly
 // what it says itself, so whatever a program writes to such a connection it also reads from it:
 // a loop through the transmit and receive offloads.
+//   +tcpsink   instead, be a TCP server that accepts any connection, acknowledges what arrives
+//              in order and reports anything that arrives out of order: a segment the SoC
+//              should have sent and did not shows up here as a gap
 `timescale 1ns / 1ps
 module tb;
   logic clk = 0, rst = 1;
@@ -43,6 +46,58 @@ module tb;
   logic [7:0] rx_tdata = 0, tx_tdata;
   logic       rx_tvalid = 0, rx_tlast = 0, tx_tvalid, tx_tlast;
   logic [7:0] txq[$], back[$][];
+  bit tcp_sink = 0;
+  initial tcp_sink = $test$plusargs("tcpsink");
+  logic [31:0] sink_nxt = 0;      // next sequence number expected
+  bit          sink_open = 0, sink_fin = 0;
+  int sink_segs = 0, sink_gaps = 0, sink_dups = 0, sink_bytes = 0;
+
+  // an acknowledgement (or SYN-ACK, with an MSS option) from the sink for the segment in f
+  function automatic void sink_reply(input logic [7:0] f[$], input int l4, input logic [7:0] flags);
+    automatic int hl = flags[1] ? 24 : 20, n = 14 + 20 + hl;
+    automatic logic [7:0] r[] = new[60];
+    automatic logic [31:0] seq = flags[1] ? 32'h0000_1000 : 32'h0000_1001 + 32'(sink_fin && !flags[0]);
+    automatic logic [15:0] c;
+    automatic logic [7:0] q[$];
+    for (int i = 0; i < 60; i++) r[i] = 8'h00;
+    for (int i = 0; i < 6; i++) begin r[i] = f[6 + i]; r[6 + i] = f[i]; end
+    r[12] = 8'h08; r[14] = 8'h45; r[16] = 8'(( 20 + hl) >> 8); r[17] = 8'(20 + hl); r[20] = 8'h40; r[22] = 8'd64; r[23] = 8'd6;
+    for (int i = 0; i < 4; i++) begin r[26 + i] = f[30 + i]; r[30 + i] = f[26 + i]; end
+    r[34] = f[l4 + 2]; r[35] = f[l4 + 3]; r[36] = f[l4]; r[37] = f[l4 + 1];
+    for (int i = 0; i < 4; i++) begin r[38 + i] = seq[8*(3-i)+:8]; r[42 + i] = sink_nxt[8*(3-i)+:8]; end
+    r[46] = 8'(hl << 2); r[47] = flags; r[48] = 8'hff; r[49] = 8'hff;
+    if (flags[1]) begin r[54] = 8'd2; r[55] = 8'd4; r[56] = 8'h05; r[57] = 8'hb4; end      // MSS 1460
+    for (int i = 0; i < n; i++) q.push_back(r[i]);
+    c = ~csum(q, 14, 20, 0);  r[24] = c[15:8]; r[25] = c[7:0];
+    c = ~csum(q, 34, hl, {16'b0, r[26], r[27]} + {16'b0, r[28], r[29]} + {16'b0, r[30], r[31]} + {16'b0, r[32], r[33]} + 32'd6 + 32'(hl));
+    r[50] = c[15:8]; r[51] = c[7:0];
+    back.push_back(r);
+  endfunction
+
+  function automatic void sink_segment(input logic [7:0] f[$], input int l4, input int l4len);
+    automatic logic [31:0] seq = {f[l4 + 4], f[l4 + 5], f[l4 + 6], f[l4 + 7]};
+    automatic int len = l4len - int'(f[l4 + 12][7:4]) * 4;
+    automatic logic [7:0] fl = f[l4 + 13];
+    if (fl[2]) begin sink_open = 0; return; end                                // RST
+    if (fl[1]) begin                                                           // SYN
+      sink_nxt = seq + 32'd1; sink_open = 1; sink_fin = 0;
+      sink_reply(f, l4, 8'h12);
+      return;
+    end
+    if (!sink_open || (len == 0 && !fl[0])) return;                            // a bare ACK
+    sink_segs++;
+    if (seq == sink_nxt) begin
+      sink_nxt = sink_nxt + 32'(len) + 32'(fl[0]);
+      sink_bytes += len;
+      if (fl[0]) begin sink_reply(f, l4, 8'h11); sink_fin = 1; return; end
+    end else if (int'(seq - sink_nxt) > 0) begin
+      sink_gaps++;
+      if (sink_gaps <= 20) $display("\n@@ SINK: frame %0d: sequence %0d bytes ahead of what has arrived (%0d bytes in this segment, %0d received so far)",
+                                    eth_frames, seq - sink_nxt, len, sink_bytes);
+    end else sink_dups++;
+    sink_reply(f, l4, 8'h10);
+  endfunction
+
   int eth_frames = 0, eth_ip_ok = 0, eth_ip_bad = 0, eth_l4_ok = 0, eth_l4_bad = 0, eth_reflected = 0, eth_arp = 0, eth_longest = 0, eth_full = 0;
 
   function automatic logic [15:0] csum(input logic [7:0] d[$], input int from, input int len, input logic [31:0] init);
@@ -83,7 +138,8 @@ module tb;
           $display("\n@@ ETH ERROR: frame %0d (%0d bytes, protocol %0d, %0d bytes of it): bad checksum, field %02x%02x", eth_frames, n, f[23], l4len,
                    f[l4 + (f[23] == 8'd6 ? 16 : 6)], f[l4 + (f[23] == 8'd6 ? 17 : 7)]);
         end
-        if (f[23] == 8'd6) begin
+        if (f[23] == 8'd6 && tcp_sink) sink_segment(f, l4, l4len);
+        else if (f[23] == 8'd6) begin
           automatic logic [7:0] r[] = new[n < 60 ? 60 : n];
           for (int i = 0; i < r.size(); i++) r[i] = i < n ? f[i] : 8'h00;
           for (int i = 0; i < 6; i++) begin r[i] = f[6 + i]; r[6 + i] = f[i]; end
@@ -112,6 +168,8 @@ module tb;
       repeat (24) @(posedge clk);
     end
   end
+  final if (tcp_sink) $display("@@ sink: %0d data segments, %0d bytes in order, %0d segments ahead of sequence (something before them was missing), %0d repeats",
+                               sink_segs, sink_bytes, sink_gaps, sink_dups);
   final $display("@@ ethernet: %0d frames sent by the SoC (longest %0d bytes, %0d full size), %0d ARP answered, IPv4 header checksums %0d good %0d bad, TCP/UDP checksums %0d good %0d bad, %0d TCP segments sent back, dropped by the receiver %0d",
                  eth_frames, eth_longest, eth_full, eth_arp, eth_ip_ok, eth_ip_bad, eth_l4_ok, eth_l4_bad, eth_reflected, dut.u_eth.rx_dropped);
 

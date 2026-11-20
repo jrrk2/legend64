@@ -2,8 +2,8 @@
 # Network benchmark of the Debian NFS-root system on the shared VC707: JTAG-load the bitstream,
 # send OpenSBI, the kernel and the NFS-root device tree, wait for the system's SSH server, and
 # over SSH (as the invoking user, by key) run iperf3 each way against this host, check 8 MB of
-# data each way with SHA-256, time a cold read of a large file over NFS and print the
-# interface's counters. The serial console is left alone.
+# data each way with SHA-256, time a cold read of a large file over NFS and one password hash at
+# Debian's default cost, and print the interface's counters. The serial console is left alone.
 # Must run under the board lock:
 #   ~/synthgui-work/mapper-bisect/board-run.sh rv64g "<purpose>" -- fpga/scripts/board_nfs_bench.sh <bitstream> [dtb]
 # With no bitstream ("-") the running system is measured as it is.
@@ -47,6 +47,7 @@ echo '== iperf3, board receives'; iperf3 -c $H -p 5202 -t 10 -R | tail -4 | head
 echo '== 8 MB to the host';       head -c 8000000 $big > /dev/tcp/$H/5003
 echo '== 8 MB from the host';     sha256sum < /dev/tcp/$H/5004
 echo '== cold NFS read';          dd if=$cold of=/dev/null bs=64k 2>&1 | tail -1
+echo '== one yescrypt password hash'; ( time -p perl -e 'crypt(q(test), q(\$y\$j9T\$abcdefghijklmnop\$))' ) 2>&1 | tr '\n' ' '; echo
 ip -s -s link show end0 | sed -n 3,10p
 grep -E '^Tcp:' /proc/net/snmp | tail -1"
 sleep 1
