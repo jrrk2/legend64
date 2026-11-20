@@ -267,31 +267,31 @@ module legend64_fpu (
                    A.sign & !A.inf & !A.nan & !A.zero & !a_sub, A.sign & A.inf};
 
   logic comb_op;   // finishes in the start cycle
+  // scratch values of the block below, given a value on every path so that none is a latch
+  logic cb_s, cb_pick_a, cb_any_nan;
   always_comb begin
     comb_res = '0;
     comb_fl  = '0;
     comb_op  = 1'b1;
+    cb_s = 1'b0; cb_pick_a = 1'b0; cb_any_nan = 1'b0;
     if (is_sgnj) begin
-      logic s;
-      s = f3[1] ? A.sign ^ B.sign : f3[0] ? !B.sign : B.sign;
-      comb_res = dbl ? {s, a_raw[62:0]} : {32'hffff_ffff, s, a_cmp[30:0]};
+      cb_s = f3[1] ? A.sign ^ B.sign : f3[0] ? !B.sign : B.sign;
+      comb_res = dbl ? {cb_s, a_raw[62:0]} : {32'hffff_ffff, cb_s, a_cmp[30:0]};
     end else if (is_minmax) begin
-      logic pick_a;
       comb_fl = {A.snan | B.snan, 4'b0};
       if (A.nan && B.nan) comb_res = dbl ? QNAN_D : QNAN_S;
       else begin
-        if (A.nan) pick_a = 1'b0;
-        else if (B.nan) pick_a = 1'b1;
-        else pick_a = f3[0] ? !a_lt_b && !(A.zero && B.zero && A.sign) : a_lt_b || (A.zero && B.zero && A.sign);
-        comb_res = dbl ? (pick_a ? a_raw : b_raw) : {32'hffff_ffff, pick_a ? a_cmp[31:0] : b_cmp[31:0]};
+        if (A.nan) cb_pick_a = 1'b0;
+        else if (B.nan) cb_pick_a = 1'b1;
+        else cb_pick_a = f3[0] ? !a_lt_b && !(A.zero && B.zero && A.sign) : a_lt_b || (A.zero && B.zero && A.sign);
+        comb_res = dbl ? (cb_pick_a ? a_raw : b_raw) : {32'hffff_ffff, cb_pick_a ? a_cmp[31:0] : b_cmp[31:0]};
       end
     end else if (is_cmp) begin
-      logic any_nan;
-      any_nan = A.nan | B.nan;
+      cb_any_nan = A.nan | B.nan;
       unique case (f3[1:0])
-        2'b10:   begin comb_res = 64'(!any_nan && a_eq_b);             comb_fl = {A.snan | B.snan, 4'b0}; end
-        2'b01:   begin comb_res = 64'(!any_nan && a_lt_b);             comb_fl = {any_nan, 4'b0}; end
-        default: begin comb_res = 64'(!any_nan && (a_lt_b || a_eq_b)); comb_fl = {any_nan, 4'b0}; end
+        2'b10:   begin comb_res = 64'(!cb_any_nan && a_eq_b);             comb_fl = {A.snan | B.snan, 4'b0}; end
+        2'b01:   begin comb_res = 64'(!cb_any_nan && a_lt_b);             comb_fl = {cb_any_nan, 4'b0}; end
+        default: begin comb_res = 64'(!cb_any_nan && (a_lt_b || a_eq_b)); comb_fl = {cb_any_nan, 4'b0}; end
       endcase
     end else if (is_f2i) begin
       comb_res = f2i_res;
@@ -305,21 +305,19 @@ module legend64_fpu (
       comb_fl = {fma_nv, 4'b0};
       if (fma_nan) comb_res = dbl ? QNAN_D : QNAN_S;
       else begin
-        logic s;
-        s = p_inf ? p_sign : c_sign;
-        comb_res = dbl ? {s, 11'h7ff, 52'b0} : {32'hffff_ffff, s, 8'hff, 23'b0};
+        cb_s = p_inf ? p_sign : c_sign;
+        comb_res = dbl ? {cb_s, 11'h7ff, 52'b0} : {32'hffff_ffff, cb_s, 8'hff, 23'b0};
       end
     end else if (is_div && (A.nan || B.nan || A.inf || B.inf || A.zero || B.zero)) begin
-      logic s;
-      s = A.sign ^ B.sign;
+      cb_s = A.sign ^ B.sign;
       if (A.nan || B.nan || (A.inf && B.inf) || (A.zero && B.zero)) begin
         comb_res = dbl ? QNAN_D : QNAN_S;
         comb_fl  = {A.snan | B.snan | (A.inf & B.inf) | (A.zero & B.zero), 4'b0};
       end else if (A.inf || B.zero) begin
-        comb_res = dbl ? {s, 11'h7ff, 52'b0} : {32'hffff_ffff, s, 8'hff, 23'b0};
+        comb_res = dbl ? {cb_s, 11'h7ff, 52'b0} : {32'hffff_ffff, cb_s, 8'hff, 23'b0};
         comb_fl  = {1'b0, B.zero & !A.inf, 3'b0};
       end else begin
-        comb_res = dbl ? {s, 63'b0} : {32'hffff_ffff, s, 31'b0};
+        comb_res = dbl ? {cb_s, 63'b0} : {32'hffff_ffff, cb_s, 31'b0};
       end
     end else if (is_sqrt && (A.nan || A.zero || A.inf || A.sign)) begin
       if (A.nan || (A.sign && !A.zero)) begin

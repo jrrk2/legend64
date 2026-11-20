@@ -805,13 +805,17 @@ module legend64 #(
 
   initial for (int i = 0; i < (1 << BHT_BITS); i++) bht[i] = 2'b01;
 
+  // a two-bit saturating counter per entry
+  logic [1:0] bht_cur, bht_next;
+  assign bht_cur  = bht[bht_idx];
+  assign bht_next = br_taken ? (bht_cur == 2'b11 ? 2'b11 : bht_cur + 2'd1)
+                             : (bht_cur == 2'b00 ? 2'b00 : bht_cur - 2'd1);
+
   always_ff @(posedge clk) begin
     if (m_done && m_wen)  regs[m_rd]  <= m_wdata;
     if (m_done && m_fwen) fregs[m_rd] <= m_wdata;
-    if (x_done && op_branch) begin
-      if (br_taken && bht[bht_idx] != 2'b11)  bht[bht_idx] <= bht[bht_idx] + 2'd1;
-      if (!br_taken && bht[bht_idx] != 2'b00) bht[bht_idx] <= bht[bht_idx] - 2'd1;
-    end
+    // one write, so that the table is a memory with one write port to every synthesis tool
+    if (x_done && op_branch) bht[bht_idx] <= bht_next;
     if (e_take && e_flt == 2'd0) begin
       if (e_call) begin
         ras[0] <= e_seq; ras[1] <= ras[0]; ras[2] <= ras[1]; ras[3] <= ras[2];
