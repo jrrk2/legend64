@@ -67,6 +67,7 @@ module litedram_line_adapter #(
     req_s <= {req_s[0], req};
     if (rst) begin
       state <= A_IDLE;
+      req_s <= '0; we_q <= 1'b0; cmd_done <= 1'b0; wd_done <= 1'b0; rdata <= '0;
     end else begin
       unique case (state)
         A_IDLE: if (req_s[1]) begin
@@ -103,7 +104,7 @@ module litedram_line_adapter #(
   always_ff @(posedge clk) begin
     creq_s <= {creq_s[0], csr_req};
     if (rst) begin
-      c_busy <= 1'b0; csr_ack <= 1'b0;
+      c_busy <= 1'b0; csr_ack <= 1'b0; creq_s <= '0; csr_rdata <= '0;
     end else if (c_busy) begin
       if (wb_ack) begin c_busy <= 1'b0; csr_ack <= 1'b1; csr_rdata <= wb_dat_r; end
     end else if (csr_ack) begin

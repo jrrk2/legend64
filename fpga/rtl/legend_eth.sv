@@ -56,21 +56,31 @@ module legend_sync_val #(
     parameter int W = 12
 ) (
     input  logic         src_clk,
-    input  logic [W-1:0] src_val,
+    input  logic         src_rst,      // each side has the reset of its own clock; if only one
+    input  logic [W-1:0] src_val,      // is reset the loop settles again by itself
     input  logic         dst_clk,
+    input  logic         dst_rst,
     output logic [W-1:0] dst_val
 );
-  logic [W-1:0] hold = '0, dst_q = '0;
-  logic         req = 1'b0, ack = 1'b0;
-  (* ASYNC_REG = "TRUE" *) logic [1:0] ack_s = '0, req_s = '0;
+  logic [W-1:0] hold, dst_q;
+  logic         req, ack;
+  (* ASYNC_REG = "TRUE" *) logic [1:0] ack_s, req_s;
   assign dst_val = dst_q;
   always_ff @(posedge src_clk) begin
-    ack_s <= {ack_s[0], ack};
-    if (ack_s[1] == req && src_val != hold) begin hold <= src_val; req <= !req; end
+    if (src_rst) begin
+      ack_s <= '0; hold <= '0; req <= 1'b0;
+    end else begin
+      ack_s <= {ack_s[0], ack};
+      if (ack_s[1] == req && src_val != hold) begin hold <= src_val; req <= !req; end
+    end
   end
   always_ff @(posedge dst_clk) begin
-    req_s <= {req_s[0], req};
-    if (req_s[1] != ack) begin dst_q <= hold; ack <= req_s[1]; end
+    if (dst_rst) begin
+      req_s <= '0; dst_q <= '0; ack <= 1'b0;
+    end else begin
+      req_s <= {req_s[0], req};
+      if (req_s[1] != ack) begin dst_q <= hold; ack <= req_s[1]; end
+    end
   end
 endmodule
 
@@ -116,8 +126,8 @@ module legend_pkt_fifo #(
     end
   end
 
-  legend_sync_val #(.W(AW + 1)) u_c2r (.src_clk(wclk), .src_val(wr_commit), .dst_clk(rclk), .dst_val(commit_r));
-  legend_sync_val #(.W(AW + 1)) u_r2w (.src_clk(rclk), .src_val(rd_ptr), .dst_clk(wclk), .dst_val(rd_ptr_w));
+  legend_sync_val #(.W(AW + 1)) u_c2r (.src_clk(wclk), .src_rst(wrst), .src_val(wr_commit), .dst_clk(rclk), .dst_rst(rrst), .dst_val(commit_r));
+  legend_sync_val #(.W(AW + 1)) u_r2w (.src_clk(rclk), .src_rst(rrst), .src_val(rd_ptr), .dst_clk(wclk), .dst_rst(wrst), .dst_val(rd_ptr_w));
 
   assign r_valid = rd_ptr != commit_r;
   assign rd_next = rd_ptr + (AW+1)'(r_valid && r_ready);
@@ -188,6 +198,7 @@ module legend_eth #(
       rx_en <= 1'b0; tx_en <= 1'b0; promisc <= 1'b0; irq_status <= '0; irq_enable <= '0;
       mac_addr <= '0; rx_base <= '0; tx_base <= '0; rx_size <= 16'd1; tx_size <= 16'd1;
       rx_head <= '0; rx_tail <= '0; tx_head <= '0; tx_tail <= '0; rx_dropped <= '0;
+      link_s <= '0; reg_rdata <= '0;
     end else begin
       if (ev_rx)   irq_status[0] <= 1'b1;
       if (ev_tx)   irq_status[1] <= 1'b1;
@@ -282,6 +293,7 @@ module legend_eth #(
     if (mac_rst) begin
       rxp_word <= '0; rxp_cnt <= 4'd2; rxp_first <= 1'b1; rxp_drop <= 1'b0;
       rxp_len <= '0; rxp_long <= 1'b0; rxp_lost <= 1'b0; m_fifo <= '0; m_bad <= '0; m_long <= '0;
+      rx_en_m <= '0; promisc_m <= '0;
     end else if (rx_tvalid) begin
       if (rxp_len != 11'd1518) rxp_len <= rxp_len + 11'd1;
       else begin rxp_long <= 1'b1; rxp_drop <= 1'b1; end
@@ -304,9 +316,9 @@ module legend_eth #(
 
   logic        rxf_rvalid, rxf_rready;
   logic [71:0] rxf_rdata;
-  legend_sync_val #(.W(16)) u_cf (.src_clk(mac_clk), .src_val(m_fifo), .dst_clk(clk), .dst_val(cnt_fifo));
-  legend_sync_val #(.W(16)) u_cb (.src_clk(mac_clk), .src_val(m_bad),  .dst_clk(clk), .dst_val(cnt_bad));
-  legend_sync_val #(.W(16)) u_cl (.src_clk(mac_clk), .src_val(m_long), .dst_clk(clk), .dst_val(cnt_long));
+  legend_sync_val #(.W(16)) u_cf (.src_clk(mac_clk), .src_rst(mac_rst), .src_val(m_fifo), .dst_clk(clk), .dst_rst(rst), .dst_val(cnt_fifo));
+  legend_sync_val #(.W(16)) u_cb (.src_clk(mac_clk), .src_rst(mac_rst), .src_val(m_bad), .dst_clk(clk), .dst_rst(rst), .dst_val(cnt_bad));
+  legend_sync_val #(.W(16)) u_cl (.src_clk(mac_clk), .src_rst(mac_rst), .src_val(m_long), .dst_clk(clk), .dst_rst(rst), .dst_val(cnt_long));
 
   legend_pkt_fifo #(.AW(RX_FIFO_AW)) u_rxf (
       .wclk(mac_clk), .wrst(mac_rst), .w_valid(rxf_wvalid), .w_data(rxf_wdata), .w_commit(rxf_commit),
@@ -351,8 +363,10 @@ module legend_eth #(
 
   always_ff @(posedge clk) begin
     ev_rx <= 1'b0; ev_drop <= 1'b0; rx_adv <= 1'b0;
-    if (rst) r_state <= R_IDLE;
-    else begin
+    if (rst) begin
+      r_state <= R_IDLE;
+      r_buf <= '0; r_words <= '0; r_len <= '0; r_csum <= '0; r_fold <= '0;
+    end else begin
       unique case (r_state)
         R_IDLE: if (rxf_rvalid && !rx_adv) begin
           if (rx_en && rx_head != rx_tail) r_state <= R_DESC_RD;
@@ -478,6 +492,12 @@ module legend_eth #(
     if (rst) begin
       t_state <= T_IDLE; pk_fill <= '0; pk_pend_v <= 1'b0; pk_acc <= '0;
       cnt_txq <= '0; cnt_txdisc <= '0;
+      // the rest of the transmit path's registers: each is loaded before it is used
+      t_buf <= '0; t_len <= '0; t_word <= '0; t_total <= '0; t_wi <= '0;
+      t_first <= 1'b0; t_more <= 1'b0; t_bad <= 1'b0; t_abort <= 1'b0;
+      t_csum_en <= 1'b0; t_cs <= '0; t_co <= '0; cs_sum <= '0; cs_fold <= '0;
+      s1_data <= '0; s1_lo <= '0; s1_n <= '0; pk_pend <= '0;
+      fw_v <= 1'b0; fw_word <= '0; fw_meta <= '0;
     end else begin
       if (s1_v) begin
         if (pk_tot >= 5'd8) begin
@@ -561,15 +581,15 @@ module legend_eth #(
   assign tx_tlast     = txu_cur[71] && txu_lastbyte;
   assign txf_rready   = txf_rvalid && (!txu_run || (tx_tready && txu_lastbyte && !txu_cur[71]));
   logic [15:0] m_txmac;
-  legend_sync_val #(.W(16)) u_ctm (.src_clk(mac_tx_clk), .src_val(m_txmac), .dst_clk(clk), .dst_val(cnt_txmac));
-  legend_sync_val #(.W(16)) u_ctp (.src_clk(mac_tx_clk), .src_val(tx_pcs_frames), .dst_clk(clk), .dst_val(cnt_txpcs));
+  legend_sync_val #(.W(16)) u_ctm (.src_clk(mac_tx_clk), .src_rst(mac_tx_rst), .src_val(m_txmac), .dst_clk(clk), .dst_rst(rst), .dst_val(cnt_txmac));
+  legend_sync_val #(.W(16)) u_ctp (.src_clk(mac_tx_clk), .src_rst(mac_tx_rst), .src_val(tx_pcs_frames), .dst_clk(clk), .dst_rst(rst), .dst_val(cnt_txpcs));
   always_ff @(posedge mac_tx_clk) begin
     if (mac_tx_rst) m_txmac <= '0;
     else if (tx_tvalid && tx_tready && tx_tlast) m_txmac <= m_txmac + 16'd1;
   end
   always_ff @(posedge mac_tx_clk) begin
     if (mac_tx_rst) begin
-      txu_run <= 1'b0; txu_idx <= '0;
+      txu_run <= 1'b0; txu_idx <= '0; txu_cur <= '0;
     end else if (!txu_run) begin
       if (txf_rvalid) begin txu_cur <= txf_rdata; txu_run <= 1'b1; txu_idx <= {1'b0, txf_rdata[70:68]}; end
     end else if (tx_tready) begin
@@ -592,5 +612,8 @@ module legend_eth #(
   assign t_gnt    = e_gnt && sel_tx;
   assign r_rvalid = e_rvalid && !rd_owner_tx;
   assign t_rvalid = e_rvalid && rd_owner_tx;
-  always_ff @(posedge clk) if (e_req && e_gnt && !e_we) rd_owner_tx <= sel_tx;
+  always_ff @(posedge clk) begin
+    if (rst) rd_owner_tx <= 1'b0;
+    else if (e_req && e_gnt && !e_we) rd_owner_tx <= sel_tx;
+  end
 endmodule

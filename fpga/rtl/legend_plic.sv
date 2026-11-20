@@ -46,7 +46,7 @@ module legend_plic #(
       pending <= '0; in_service <= '0; enable[0] <= '0; enable[1] <= '0;
       threshold[0] <= '0; threshold[1] <= '0;
       for (int i = 0; i <= NSRC; i++) prio[i] <= '0;
-      irq_m <= 1'b0; irq_s <= 1'b0;
+      irq_m <= 1'b0; irq_s <= 1'b0; rdata <= '0;
     end else begin
       // gateway: a source becomes pending while its line is high and it is not being serviced
       for (int i = 1; i <= NSRC; i++) if (src[i] && !in_service[i]) pending[i] <= 1'b1;

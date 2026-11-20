@@ -104,8 +104,12 @@ module legend_cache #(
   // memory handshake
   logic ack_s1, ack_s2;
   always_ff @(posedge clk) begin
-    ack_s1 <= mem_ack;
-    ack_s2 <= ack_s1;
+    if (rst) begin
+      ack_s1 <= 1'b0; ack_s2 <= 1'b0;
+    end else begin
+      ack_s1 <= mem_ack;
+      ack_s2 <= ack_s1;
+    end
   end
   assign mem_req   = state == S_WB || state == S_RD;
   assign mem_we    = state == S_WB || state == S_WB_DONE;
@@ -153,6 +157,9 @@ module legend_cache #(
       i_pend <= 1'b0;
       d_pend <= 1'b0;
       prefer_e <= 1'b0;
+      // the pending requests' details and the line being replaced: loaded before they are used
+      i_pa <= '0; d_pa <= '0; d_psrc <= 1'b0; d_pwe <= 1'b0; d_pwd <= '0; d_pbe <= '0;
+      fill_addr <= '0; v_line <= '0; v_tag <= '0;
     end else begin
       unique case (state)
         S_RUN: begin

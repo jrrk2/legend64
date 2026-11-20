@@ -53,7 +53,7 @@ module legend_uart16550 #(
   assign tx = tx_busy ? tx_sr[0] : 1'b1;
   always_ff @(posedge clk) begin
     if (rst) begin
-      tx_bits <= '0; thr_full <= 1'b0; tx_div <= '0;
+      tx_bits <= '0; thr_full <= 1'b0; tx_div <= '0; thr <= '0; tx_sr <= '1;
     end else begin
       if (wr_thr) begin thr <= wdata; thr_full <= 1'b1; end
       if (!tx_busy) begin
@@ -78,6 +78,7 @@ module legend_uart16550 #(
     rx_push <= 1'b0;
     if (rst) begin
       rx_active <= 1'b0;
+      rx_sync <= '1; rx_div <= '0; rx_bits <= '0; rx_sr <= '0; rx_byte <= '0;   // the line idles high
     end else if (tick16) begin
       if (!rx_active) begin
         if (!rx_sync[2]) begin rx_active <= 1'b1; rx_div <= 4'd0; rx_bits <= 4'd0; end
@@ -99,6 +100,7 @@ module legend_uart16550 #(
   always_ff @(posedge clk) begin
     if (rst) begin
       f_cnt <= '0; f_rd <= '0; f_wr <= '0; overrun <= 1'b0;
+      for (int i = 0; i < 16; i++) fifo[i] <= '0;
     end else begin
       if (sel && we && addr == 3'd2 && wdata[1]) begin f_cnt <= '0; f_rd <= '0; f_wr <= '0; end   // FCR: clear receive FIFO
       else begin

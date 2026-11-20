@@ -83,20 +83,28 @@ module legend_sgmii #(
   assign phy_reset_n = ~rst_int;
 
   // status, laid out as vc707_ethmin's wrapper does: the boot monitor prints it
-  reg [25:0] hb_tx = 0, hb_rx = 0;
-  reg        txen_seen = 0, rxdv_seen = 0, txen_q = 0;
-  reg [3:0]  tx_frames = 0;
-  reg [15:0] tx_frames16 = 0;
+  reg [25:0] hb_tx, hb_rx;
+  reg        txen_seen, rxdv_seen, txen_q;
+  reg [3:0]  tx_frames;
+  reg [15:0] tx_frames16;
   assign tx_frames_out = tx_frames16;
   always @(posedge tx_clk) begin
-    hb_tx  <= hb_tx + 1'b1;
-    txen_q <= gmii_tx_en;
-    if (gmii_tx_en) txen_seen <= 1'b1;
-    if (gmii_tx_en && !txen_q) begin tx_frames <= tx_frames + 1'b1; tx_frames16 <= tx_frames16 + 1'b1; end
+    if (tx_rst) begin
+      hb_tx <= 26'd0; txen_q <= 1'b0; txen_seen <= 1'b0; tx_frames <= 4'd0; tx_frames16 <= 16'd0;
+    end else begin
+      hb_tx  <= hb_tx + 1'b1;
+      txen_q <= gmii_tx_en;
+      if (gmii_tx_en) txen_seen <= 1'b1;
+      if (gmii_tx_en && !txen_q) begin tx_frames <= tx_frames + 1'b1; tx_frames16 <= tx_frames16 + 1'b1; end
+    end
   end
   always @(posedge rx_clk) begin
-    hb_rx <= hb_rx + 1'b1;
-    if (gmii_rx_dv) rxdv_seen <= 1'b1;
+    if (rx_rst) begin
+      hb_rx <= 26'd0; rxdv_seen <= 1'b0;
+    end else begin
+      hb_rx <= hb_rx + 1'b1;
+      if (gmii_rx_dv) rxdv_seen <= 1'b1;
+    end
   end
   assign pcspma_status = {tx_frames, 2'b10, hb_tx[25], hb_rx[25], txen_seen, rxdv_seen, 4'b0, phy_ready, link_up};
 endmodule

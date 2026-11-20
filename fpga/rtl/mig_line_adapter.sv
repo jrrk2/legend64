@@ -46,6 +46,7 @@ module mig_line_adapter #(
     req_s2 <= req_s1;
     if (ui_rst) begin
       state <= A_IDLE;
+      req_s1 <= 1'b0; req_s2 <= 1'b0; we_q <= 1'b0; cmd_done <= 1'b0; wdf_done <= 1'b0; rdata <= '0;
     end else begin
       unique case (state)
         A_IDLE: if (req_s2) begin

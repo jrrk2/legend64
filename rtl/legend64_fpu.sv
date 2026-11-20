@@ -425,15 +425,24 @@ module legend64_fpu (
     end
   end
 
+  // The mantissa product, in a block of its own with a synchronous reset, so that the register can
+  // be the output register of an FPGA's multiplier block (which has no asynchronous reset).
+  always_ff @(posedge clk) begin
+    if (!rst_n) prod <= '0;
+    else if (state == S_IDLE && start && !comb_op && is_fma) prod <= M1.mant * M2.mant;
+  end
+
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       state <= S_IDLE;
+      int_q <= '0; base_q <= '0; sign_q <= 1'b0;
+      n_mant <= '0; n_sticky <= 1'b0; n_zero <= 1'b0; n_exp <= '0;
+      cnt <= '0; dv_q <= '0; dv_r <= '0; sq_n <= '0; sq_rem <= '0; sq_root <= '0;
     end else begin
       unique case (state)
         S_IDLE: if (start && !comb_op) begin
           if (is_fma) begin
-            prod  <= M1.mant * M2.mant;
-            state <= S_ADD;
+            state <= S_ADD;        // the product is registered below
           end else if (is_div) begin
             dv_r <= {3'b0, A.mant}; dv_q <= '0; cnt <= 7'd58;
             sign_q <= A.sign ^ B.sign;

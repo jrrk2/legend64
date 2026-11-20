@@ -64,9 +64,16 @@ module legend64_tlb #(
     end
   end
 
+  // flush is also the reset: it clears the entries and the replacement pointer with the valid
+  // bits, so that no register here is ever without a defined value
   always_ff @(posedge clk) begin
-    if (flush) valid <= '0;
-    else if (fill) begin
+    if (flush) begin
+      valid <= '0;
+      next  <= '0;
+      for (int i = 0; i < N; i++) begin
+        e_vpn[i] <= '0; e_ppn[i] <= '0; e_lvl[i] <= '0; e_perm[i] <= '0;
+      end
+    end else if (fill) begin
       valid[next]  <= 1'b1;
       e_vpn[next]  <= fill_vpn;
       e_ppn[next]  <= fill_ppn;
@@ -811,18 +818,34 @@ module legend64 #(
   assign bht_next = br_taken ? (bht_cur == 2'b11 ? 2'b11 : bht_cur + 2'd1)
                              : (bht_cur == 2'b00 ? 2'b00 : bht_cur - 2'd1);
 
+  // The register files and the branch history table are memories: written a word at a time, read
+  // by address, and not reset (a RAM has no reset; software and the predictor's training give
+  // them their contents).
   always_ff @(posedge clk) begin
     if (m_done && m_wen)  regs[m_rd]  <= m_wdata;
     if (m_done && m_fwen) fregs[m_rd] <= m_wdata;
     // one write, so that the table is a memory with one write port to every synthesis tool
     if (x_done && op_branch) bht[bht_idx] <= bht_next;
-    if (e_take && e_flt == 2'd0) begin
+  end
+  // the return address stack is four registers
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      ras[0] <= '0; ras[1] <= '0; ras[2] <= '0; ras[3] <= '0;
+    end else if (e_take && e_flt == 2'd0) begin
       if (e_call) begin
         ras[0] <= e_seq; ras[1] <= ras[0]; ras[2] <= ras[1]; ras[3] <= ras[2];
       end else if (e_ret) begin
         ras[0] <= ras[1]; ras[1] <= ras[2]; ras[2] <= ras[3];
       end
     end
+  end
+
+  // The multiplier's product register, in a block of its own with a synchronous reset: the
+  // output register of an FPGA's multiplier block has no asynchronous one, and with one here
+  // the register could not be part of it.
+  always_ff @(posedge clk) begin
+    if (!rst_n) mul_p <= '0;
+    else if (x_first && !x_trap && is_mul) mul_p <= mul_full[127:0];
   end
 
   // ------------------------------------------------------------------ sequential: pipeline and CSRs
@@ -848,6 +871,14 @@ module legend64 #(
       mcounteren <= '0; scounteren <= '0; satp_sv39 <= 1'b0; satp_ppn <= '0;
       fflags <= '0; frm <= '0;
       resv_valid <= 1'b0;
+      // the data registers of the pipeline, the multiplier, the divider and the page-table
+      // walker: nothing reads them before they are loaded, but none is left without a value
+      buf_data <= '0;
+      ir <= '0; ir_raw <= '0; ir_c <= 1'b0; ir_flt <= '0; ir_pc <= '0; ir_pnpc <= '0;
+      m_rd <= '0; m_val <= '0; m_pc <= '0; m_insn <= '0; m_f3 <= '0; m_off <= '0; m_box <= 1'b0;
+      amo_data <= '0; amo_paddr <= '0; resv_addr <= '0;
+      div_rem <= '0; div_quo <= '0; div_den <= '0; div_cnt <= '0; div_neg_q <= 1'b0; div_neg_r <= 1'b0;
+      ptw_vpn <= '0; ptw_level <= '0; ptw_a <= '0; iptw_fault_vpn <= '0;
     end else begin
       // ---- fetch
       if (fetch_issue || fault_issue) begin
@@ -934,8 +965,7 @@ module legend64 #(
       unique case (x_state)
         X_IDLE: if (x_first && !x_trap) begin
           if (is_mul) begin
-            x_state <= X_MUL;
-            mul_p   <= mul_full[127:0];
+            x_state <= X_MUL;      // the product is registered below
           end else if (is_div) begin
             x_state   <= X_DIV;
             div_cnt   <= 7'd64;
