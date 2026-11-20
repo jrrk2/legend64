@@ -7,16 +7,30 @@ Roughly in priority order within each section. Measurements are from the VC707 a
 - **A kernel oops seen once on the board:** the trap handler entered a second time while still on
   user registers (`handle_exception+0x8c`, in `systemd-sysctl`). Looks like a rare fault in the
   core's trap or interrupt entry. Not reproduced, not investigated.
-- **CoreMark, Dhrystone and Whetstone** on the board, and the same on Rocket.
-- **synthgui's open flow** (`synthgui/`): the design synthesises, places and routes at 12.5 MHz
-  with every clock passing, but the bitstream is silent on the board: the core never runs the
-  monitor. The same mapper netlist placed and routed by Vivado is silent too. A Vivado-synthesised
-  12.5 MHz build is the control that tells a mapper fault from a 12.5 MHz fault in the design;
-  built, not yet run. LVS proves the logic and cannot check the PLL and the MMCME2_BASE.
-- **Timing margin:** the 1 MiB cache build with the corrected MAC closes at +0.003 ns.
+- **Reserve boot and settings in flash:** a JFFS2 filesystem in the flash's `reserve` partition
+  (12 MiB) holding a settings file (MAC address, IP address, TFTP server, boot order) and a
+  reserve kernel with a small root for when the network is away. Needs a read-only JFFS2 reader
+  in the monitor. Not started; the partition is blank.
+- **Flash self-update, last step:** write a build that has the flash-capable monitor in ROM to
+  the `bitstream` partition through the SoC itself and let it reload (`netload.py --flash
+  ... --reconfigure`). Everything before that step has run on the board.
+- **Timing margin:** the build with the flash bridge closes at +0.056 ns.
 
 ## Done recently
 
+- synthgui's open flow: the silent bitstream was the mapper dropping a part-select write at an
+  offset that is not a multiple of its width (the fetch buffer's
+  `win_data[16*buf_cnt +: 32] = arr_word`), found by running RTL and netlist side by side
+  (`synthgui/netlist_compare.py`); fixed in `synthgui/patches/0005`, initial contents in `0006`.
+  The open-flow bitstream now brings the monitor up on the board at 12.5 MHz.
+- Boot with no host script: the monitor fetches firmware, kernel and device tree by TFTP
+  (tftpd-hpa on the host, `/srv/tftp/legend64/`); the flash holds such a build, so power-on goes
+  to a Debian login by itself.
+- A reset branch on every register except the memories; no cost in timing or area.
+- The configuration flash from the SoC: `legend_flash.sv` maps the selected 32 MiB image at
+  `0x6000_0000`; the monitor identifies, erases, programs and verifies it; Linux sees it as two
+  MTD partitions (`bitstream`, `reserve`); `reboot` reloads the FPGA from flash through ICAPE2.
+  Reads, the kernel's probe and writes to `reserve` are proven on the board.
 - TCP transmit loss with segmentation: the MAC's transmit side counted its inter-frame gap only
   once after reset (see `fpga/third_party/verilog-ethernet/`). Sending is now 68 Mbit/s with no
   retransmits.
@@ -59,12 +73,13 @@ Roughly in priority order within each section. Measurements are from the VC707 a
 - Misaligned loads and stores trap (`ma_data` tests fail); firmware emulation or hardware support.
 - UART transmit FIFO (the device tree says `ns16550`, not `ns16550a`, because there is none).
 - Why the Xilinx memory interface never calibrates in this design (LiteDRAM is used instead).
-- Reset / power-off device for clean reboots.
 
 ## Housekeeping
 
 - Move the NFS export to `/srv/nfs/legend64` and set the hostname inside the tree (needs root on
   the host), then update `nfsroot=` in `linux/dts/legend64-vc707.dts`.
+- Writing the flash from Linux needs `mtd-utils` in the NFS tree and root on the board.
+- The open flow leaves the flash pins and ICAPE2 out (`make_project.py` has not been taught them).
 - Serial password login times out; probably the 6.7 s yescrypt hash plus slow start-up, unconfirmed.
 - Decide whether `third_party/synthgui` stays a submodule or its five source files are copied in.
 - Rename the working directory `~/riscv` when nothing is running in it.
