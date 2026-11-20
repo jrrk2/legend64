@@ -38,6 +38,12 @@ fpga/litedram/build/
     and contributors, BSD 2-Clause (https://github.com/enjoy-digital/litex,
     https://github.com/enjoy-digital/litedram).
 
+fpga/third_party/verilog-ethernet/axis_gmii_tx.sv
+    The transmit side of the byte-stream Ethernet MAC: Alex Forencich's verilog-ethernet
+    (Copyright 2015-2018, MIT), as modified for lowRISC's ariane-ethernet to expose the frame
+    check sequence, with one correction made here: that modification counted the inter-frame
+    gap only once after reset, so every later frame followed one byte time behind the last.
+
 fpga/litedram/vc707_ddr3_pins.xdc
     The VC707's DDR3 pin assignments and I/O standards, taken from the constraints Xilinx's
     Memory Interface Generator writes for this board.

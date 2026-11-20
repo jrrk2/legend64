@@ -12,7 +12,8 @@ it from an NFS root.
 |---|---|
 | `rtl/` | the core: `legend64.sv`, its FPU and compressed-instruction decoder |
 | `tb/`, `scripts/`, `sw/` | core testbenches, ISA-test and QEMU-lockstep scripts, benchmarks |
-| `fpga/` | the SoC (`rtl/`), constraints, Vivado build script, boot monitor (`sw/`), testbenches, board scripts, the LiteDRAM configuration and generated core |
+| `fpga/` | the SoC (`rtl/`), constraints, Vivado build script, boot monitor (`sw/`), testbenches, board scripts, the LiteDRAM configuration and generated core, and a corrected copy of the MAC's transmit side (`third_party/`) |
+| `synthgui/` | the same design as a project for synthgui's open flow (its Verilator-based mapper, nextpnr, prjxray), and patches for that mapper |
 | `linux/` | kernel configuration and build script, the Ethernet driver, device tree, initramfs and Debian NFS-root scripts; see `linux/README.md` |
 | `third_party/` | dependencies as submodules, below |
 | `ref/` | `riscv-tests` (the ISA tests) and `picorv32` (comparison core for the benchmarks), as submodules |
