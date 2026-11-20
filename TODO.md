@@ -9,11 +9,9 @@ Roughly in priority order within each section. Measurements are from the VC707 a
   core's trap or interrupt entry. Not reproduced, not investigated.
 - **Reserve boot and settings in flash:** a JFFS2 filesystem in the flash's `reserve` partition
   (12 MiB) holding a settings file (MAC address, IP address, TFTP server, boot order) and a
-  reserve kernel with a small root for when the network is away. Needs a read-only JFFS2 reader
-  in the monitor. Not started; the partition is blank.
-- **Flash self-update, last step:** write a build that has the flash-capable monitor in ROM to
-  the `bitstream` partition through the SoC itself and let it reload (`netload.py --flash
-  ... --reconfigure`). Everything before that step has run on the board.
+  reserve kernel with a small root for when the network is away. The read-only JFFS2 reader is
+  written and tested on the host (`scripts/test_jffs2.sh`); the monitor does not use it yet and
+  the partition is blank.
 - **Timing margin:** the build with the flash bridge closes at +0.056 ns.
 
 ## Done recently
@@ -30,7 +28,8 @@ Roughly in priority order within each section. Measurements are from the VC707 a
 - The configuration flash from the SoC: `legend_flash.sv` maps the selected 32 MiB image at
   `0x6000_0000`; the monitor identifies, erases, programs and verifies it; Linux sees it as two
   MTD partitions (`bitstream`, `reserve`); `reboot` reloads the FPGA from flash through ICAPE2.
-  Reads, the kernel's probe and writes to `reserve` are proven on the board.
+  All of it runs on the board: the flash was rewritten twice through the SoC
+  (`netload.py --flash ... --reconfigure`), and `reboot` under Linux brings the board back.
 - TCP transmit loss with segmentation: the MAC's transmit side counted its inter-frame gap only
   once after reset (see `fpga/third_party/verilog-ethernet/`). Sending is now 68 Mbit/s with no
   retransmits.

@@ -13,7 +13,9 @@
 //   0x3000_0000  Ethernet MAC registers (see legend_eth.sv)
 //   0x4000_0000  memory controller registers, 64 KiB (LiteDRAM builds: the monitor runs the
 //                DDR3 initialisation and levelling through these before it uses the memory)
-//   0x6000_0000  32 MiB window onto the configuration flash (see legend_flash.sv)
+//   0x6000_0000  the configuration flash (see legend_flash.sv): the 32 MiB image the board's
+//                switch selects, repeated four times to fill the device's 128 MiB, because
+//                the kernel's driver touches every part of the device it has identified
 //   0x8000_0000  1 GiB DDR3 through the cache
 module legend64_soc #(
     parameter int unsigned CLK_HZ   = 50_000_000,
@@ -150,7 +152,7 @@ module legend64_soc #(
   assign sel_plic = dmem_addr[31:26] == 6'h03;                 // 0x0c00_0000 .. 0x0fff_ffff
   assign sel_eth  = dmem_addr[31:12] == 20'h30000;
   assign sel_dcsr = dmem_addr[31:16] == 16'h4000;
-  assign sel_flash = dmem_addr[31:25] == 7'h30;                // 0x6000_0000 .. 0x61ff_ffff
+  assign sel_flash = dmem_addr[31:27] == 5'h0c;                // 0x6000_0000 .. 0x67ff_ffff
 
   // An access to the memory controller's registers is granted only when its handshake has
   // completed; the core holds the request steady until then.

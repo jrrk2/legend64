@@ -4,7 +4,7 @@
 #   out/legend64-vc707.dtb            NFS root (the default bootargs in the .dts)
 #   out/legend64-vc707-initramfs.dtb  boots out/initramfs.cpio.gz preloaded at INITRD_ADDR
 # Overrides (environment):
-#   TIMEBASE_HZ=50000000 ./build-dtb.sh      CPU/mtime clock, default 25000000
+#   TIMEBASE_HZ=12500000 ./build-dtb.sh      CPU/mtime clock, default 50000000
 #   BOOTARGS_NFS="..." / BOOTARGS_INITRAMFS="..."   replace a command line
 #   INITRD_ADDR=0x88000000                   where the boot monitor puts the initramfs
 # The initramfs variant records the exact initramfs size, so rerun this after
@@ -14,7 +14,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 T=/home/jonathan/riscv/tools/root
 DTC="env LD_LIBRARY_PATH=$T/usr/lib/x86_64-linux-gnu $T/usr/bin/dtc"
 CPP="cpp -nostdinc -undef -x assembler-with-cpp -P"
-TIMEBASE_HZ=${TIMEBASE_HZ:-25000000}
+TIMEBASE_HZ=${TIMEBASE_HZ:-50000000}
 INITRD_ADDR=${INITRD_ADDR:-0x88000000}
 BOOTARGS_INITRAMFS=${BOOTARGS_INITRAMFS:-console=ttyS0,115200 earlycon rdinit=/init}
 dts=$here/dts/legend64-vc707.dts

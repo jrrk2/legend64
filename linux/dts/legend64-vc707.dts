@@ -5,12 +5,12 @@
  *
  * This file goes through the C preprocessor (see build-dtb.sh):
  *   TIMEBASE_HZ   mtime tick rate = CPU clock (the one value to change if the
- *                 clock rises), default 25 MHz
+ *                 clock changes), default 50 MHz
  *   BOOTARGS      kernel command line, default = NFS root
  *   INITRD_START / INITRD_END   when defined, describe a preloaded initramfs
  */
 #ifndef TIMEBASE_HZ
-#define TIMEBASE_HZ 25000000
+#define TIMEBASE_HZ 50000000
 #endif
 #ifndef BOOTARGS
 #define BOOTARGS "console=ttyS0,115200 earlycon root=/dev/nfs nfsroot=192.168.1.176:/srv/nfs/fable64,vers=3,tcp,rsize=32768,wsize=32768 rw ip=192.168.1.51::192.168.1.1:255.255.255.0:legend64:eth0:off"
@@ -72,8 +72,8 @@
 	/* a reboot is a reload of the FPGA from its flash: everything starts cold */
 	reboot {
 		compatible = "syscon-reboot";
-		regmap = <&board>;
-		offset = <0x18>;
+		regmap = <&reconfig>;
+		offset = <0x0>;
 		value = <0x49505247>;
 	};
 
@@ -133,21 +133,30 @@
 			local-mac-address = [02 00 00 fa b1 e5];
 		};
 
-		/* LEDs, switches, build identifier; and the register that reloads the FPGA */
-		board: syscon@20000000 {
-			compatible = "legend,board", "syscon";
-			reg = <0x0 0x20000000 0x0 0x100>;
+		/*
+		 * The register that reloads the FPGA from its flash, as a syscon of
+		 * its own so that the reboot node's offset is 0: OpenSBI, which
+		 * takes the reboot call, accepts only offsets that are multiples of
+		 * 32 in a syscon (v1.8.1 sets the stride to the width in bits).
+		 */
+		reconfig: syscon@20000018 {
+			compatible = "legend,reconfig", "syscon";
+			reg = <0x0 0x20000018 0x0 0x8>;
 			reg-io-width = <4>;
 		};
 
 		/*
 		 * The FPGA's configuration flash (128 MiB, 16 bits wide) through an
 		 * asynchronous bus bridge. Switch SW11 drives its top two address
-		 * lines, so the window is the 32 MiB image the board boots from.
+		 * lines, so only the 32 MiB image the board boots from can be reached:
+		 * it appears four times over in the device's 128 MiB, and the
+		 * partitions below cover the first. The whole device is mapped
+		 * because the driver writes a reset command to each of the device's
+		 * eight internal partitions on reboot, wherever the mapping ends.
 		 */
 		flash@60000000 {
 			compatible = "cfi-flash";
-			reg = <0x0 0x60000000 0x0 0x02000000>;
+			reg = <0x0 0x60000000 0x0 0x08000000>;
 			bank-width = <2>;
 
 			partitions {
