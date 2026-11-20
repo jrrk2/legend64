@@ -237,3 +237,24 @@ CONFIG_CRC_OPTIMIZATIONS=y
 # Left off because image size/load time matter more on this board.
 # CONFIG_STRICT_KERNEL_RWX is not set
 # (EXPERT selects DEBUG_KERNEL; it only makes debug options visible)
+# The configuration flash (linear NOR, Micron G18, CFI command set 0x0200) through the SoC's
+# bus bridge at 0x6000_0000, and JFFS2 for the part of it that the bitstream leaves free.
+# zlib only, so that the boot monitor's reader needs one decompressor.
+CONFIG_MTD=y
+CONFIG_MTD_BLOCK=y
+CONFIG_MTD_CFI=y
+CONFIG_MTD_CFI_INTELEXT=y
+CONFIG_MTD_PHYSMAP=y
+CONFIG_MTD_PHYSMAP_OF=y
+CONFIG_MTD_OF_PARTS=y
+CONFIG_MISC_FILESYSTEMS=y
+CONFIG_JFFS2_FS=y
+# this flash programs in 1 KiB regions that cannot be written twice: JFFS2 needs its write buffer
+CONFIG_JFFS2_FS_WRITEBUFFER=y
+CONFIG_JFFS2_COMPRESSION_OPTIONS=y
+CONFIG_JFFS2_ZLIB=y
+# CONFIG_JFFS2_RTIME is not set
+# `reboot` reloads the FPGA from its flash: one register write, described in the device tree
+CONFIG_MFD_SYSCON=y
+CONFIG_POWER_RESET=y
+CONFIG_POWER_RESET_SYSCON=y

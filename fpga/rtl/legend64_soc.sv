@@ -8,10 +8,12 @@
 //   0x0200_0000  CLINT: msip +0x0, mtimecmp +0x4000, mtime +0xbff8 (counts clock cycles)
 //   0x0c00_0000  PLIC (source 10: UART, source 2: Ethernet)
 //   0x1000_0000  16550-compatible UART, byte registers
-//   0x2000_0000  board: LEDs +0, switches/buttons +4, status +8, clock Hz +0xc, build id +0x10
+//   0x2000_0000  board: LEDs +0, switches/buttons +4, status +8, clock Hz +0xc, build id +0x10,
+//                reconfigure +0x18 (writing 0x4950_5247 reloads the FPGA from its flash)
 //   0x3000_0000  Ethernet MAC registers (see legend_eth.sv)
 //   0x4000_0000  memory controller registers, 64 KiB (LiteDRAM builds: the monitor runs the
 //                DDR3 initialisation and levelling through these before it uses the memory)
+//   0x6000_0000  32 MiB window onto the configuration flash (see legend_flash.sv)
 //   0x8000_0000  1 GiB DDR3 through the cache
 module legend64_soc #(
     parameter int unsigned CLK_HZ   = 50_000_000,
@@ -62,7 +64,18 @@ module legend64_soc #(
     output logic         tx_tvalid,
     output logic         tx_tlast,
     input  logic         tx_tready,
-    input  logic [15:0]  pcs_status
+    input  logic [15:0]  pcs_status,
+
+    // parallel NOR flash, asynchronous bus
+    output logic [23:0]  fl_addr,
+    input  logic [15:0]  fl_dq_i,
+    output logic [15:0]  fl_dq_o,
+    output logic         fl_dq_t,
+    output logic         fl_ce_n,
+    output logic         fl_oe_n,
+    output logic         fl_we_n,
+    output logic         fl_adv_n,
+    output logic         reconfig      // set, and left set, to reload the FPGA from its flash
 );
   logic        imem_req, imem_gnt, imem_rvalid, dmem_req, dmem_we, dmem_gnt, dmem_rvalid;
   logic [63:0] imem_addr, dmem_addr, dmem_wdata, dmem_rdata;
@@ -71,7 +84,10 @@ module legend64_soc #(
   logic        core_rst_n, irq_timer, msip, irq_m_ext, irq_s_ext, uart_irq, eth_irq;
   logic [63:0] mtime, mtimecmp;
 
-  always_ff @(posedge clk) core_rst_n <= !rst && ddr_ready;
+  always_ff @(posedge clk) begin
+    if (rst) core_rst_n <= 1'b0;
+    else     core_rst_n <= ddr_ready;
+  end
 
   legend64 #(.RESET_PC(64'h0000_0000_0001_0000), .TLB_ENTRIES(TLB_ENTRIES)) u_core (
       .clk, .rst_n(core_rst_n),
@@ -118,12 +134,13 @@ module legend64_soc #(
   );
 
   // ------------------------------------------------------------------ peripherals
-  logic        mmio_wr, mmio_rd, mmio_acc, sel_uart, sel_plic, sel_eth, sel_dcsr, dcsr_gnt;
+  logic        mmio_wr, mmio_rd, mmio_acc, sel_uart, sel_plic, sel_eth, sel_dcsr, sel_flash, dcsr_gnt, fl_gnt;
   logic [31:0] wr32, plic_q, eth_q;
   logic [7:0]  uart_q;
   logic [63:0] mmio_q;
   logic        mmio_rv;
-  logic [1:0]  mmio_src;      // 0: mmio_q, 1: PLIC, 2: Ethernet, 3: memory controller
+  logic [2:0]  mmio_src;      // 0: mmio_q, 1: PLIC, 2: Ethernet, 3: memory controller, 4: flash
+  logic [63:0] fl_q;
 
   assign mmio_acc = dmem_req && dmem_gnt && d_mmio;
   assign mmio_wr  = mmio_acc && dmem_we;
@@ -133,6 +150,7 @@ module legend64_soc #(
   assign sel_plic = dmem_addr[31:26] == 6'h03;                 // 0x0c00_0000 .. 0x0fff_ffff
   assign sel_eth  = dmem_addr[31:12] == 20'h30000;
   assign sel_dcsr = dmem_addr[31:16] == 16'h4000;
+  assign sel_flash = dmem_addr[31:25] == 7'h30;                // 0x6000_0000 .. 0x61ff_ffff
 
   // An access to the memory controller's registers is granted only when its handshake has
   // completed; the core holds the request steady until then.
@@ -144,10 +162,17 @@ module legend64_soc #(
   assign dcsr_gnt   = dcsr_req && dcsr_ack_s[1];
   always_ff @(posedge clk) begin
     dcsr_ack_s <= {dcsr_ack_s[0], dcsr_ack};
-    if (!core_rst_n) dcsr_req <= 1'b0;
+    if (!core_rst_n) begin dcsr_req <= 1'b0; dcsr_ack_s <= '0; dcsr_q <= '0; end
     else if (dcsr_gnt) begin dcsr_req <= 1'b0; dcsr_q <= dcsr_rdata; end
     else if (dmem_req && d_mmio && sel_dcsr && !dcsr_ack_s[1]) dcsr_req <= 1'b1;
   end
+
+  legend_flash #(.CLK_HZ(CLK_HZ)) u_flash (
+      .clk, .rst(!core_rst_n),
+      .req(dmem_req && d_mmio && sel_flash && !fl_gnt), .we(dmem_we), .addr(dmem_addr[24:1]),
+      .be(dmem_be), .wdata(dmem_wdata), .gnt(fl_gnt), .rdata(fl_q),
+      .fl_addr, .fl_dq_i, .fl_dq_o, .fl_dq_t, .fl_ce_n, .fl_oe_n, .fl_we_n, .fl_adv_n
+  );
 
   legend_uart16550 #(.CLK_HZ(CLK_HZ), .BAUD(BAUD)) u_uart (
       .clk, .rst(!core_rst_n),
@@ -181,10 +206,11 @@ module legend64_soc #(
 
   always_ff @(posedge clk) begin
     mmio_rv  <= mmio_rd;
-    mmio_src <= sel_plic ? 2'd1 : sel_eth ? 2'd2 : sel_dcsr ? 2'd3 : 2'd0;
+    mmio_src <= sel_plic ? 3'd1 : sel_eth ? 3'd2 : sel_dcsr ? 3'd3 : sel_flash ? 3'd4 : 3'd0;
     mtime    <= mtime + 64'd1;
     if (!core_rst_n) begin
       led <= '0; msip <= 1'b0; mtime <= '0; mtimecmp <= '1; mmio_rv <= 1'b0;
+      mmio_src <= '0; mmio_q <= '0; reconfig <= 1'b0;
     end else begin
       if (mmio_wr) begin
         case (dmem_addr[31:0])
@@ -192,6 +218,7 @@ module legend64_soc #(
           32'h0200_4000: mtimecmp <= dmem_wdata;
           32'h0200_bff8: mtime <= dmem_wdata;
           32'h2000_0000: led <= wr32[7:0];
+          32'h2000_0018: if (wr32 == 32'h4950_5247) reconfig <= 1'b1;
           default: ;
         endcase
       end
@@ -217,14 +244,15 @@ module legend64_soc #(
     none_i_rv <= imem_req && imem_gnt && !i_boot && !i_ddr;
     boot_i_hi <= imem_addr[2];
     boot_d_rv <= dmem_req && dmem_gnt && !dmem_we && d_boot;
-    if (!core_rst_n) begin boot_i_rv <= 1'b0; none_i_rv <= 1'b0; boot_d_rv <= 1'b0; end
+    if (!core_rst_n) begin boot_i_rv <= 1'b0; none_i_rv <= 1'b0; boot_d_rv <= 1'b0; boot_i_hi <= 1'b0; end
   end
   assign imem_rvalid = boot_i_rv || none_i_rv || c_i_rvalid;
   assign imem_rdata  = boot_i_rv ? (boot_i_hi ? boot_iq[63:32] : boot_iq[31:0]) : none_i_rv ? 32'h0 : c_i_rdata;
 
-  assign dmem_gnt    = d_ddr ? c_d_gnt : (d_mmio && sel_dcsr) ? dcsr_gnt : 1'b1;
+  assign dmem_gnt    = d_ddr ? c_d_gnt : (d_mmio && sel_dcsr) ? dcsr_gnt : (d_mmio && sel_flash) ? fl_gnt : 1'b1;
   assign dmem_rvalid = boot_d_rv || mmio_rv || c_d_rvalid;
   assign dmem_rdata  = boot_d_rv ? boot_dq
-                     : mmio_rv ? (mmio_src == 2'd1 ? {2{plic_q}} : mmio_src == 2'd2 ? {2{eth_q}} : mmio_src == 2'd3 ? {2{dcsr_q}} : mmio_q)
+                     : mmio_rv ? (mmio_src == 3'd1 ? {2{plic_q}} : mmio_src == 3'd2 ? {2{eth_q}} : mmio_src == 3'd3 ? {2{dcsr_q}}
+                                : mmio_src == 3'd4 ? fl_q : mmio_q)
                      : c_d_rdata;
 endmodule

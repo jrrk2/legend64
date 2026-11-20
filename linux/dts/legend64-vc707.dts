@@ -69,6 +69,14 @@
 		reg = <0x0 0x80000000 0x0 0x40000000>;	/* 1 GiB */
 	};
 
+	/* a reboot is a reload of the FPGA from its flash: everything starts cold */
+	reboot {
+		compatible = "syscon-reboot";
+		regmap = <&board>;
+		offset = <0x18>;
+		value = <0x49505247>;
+	};
+
 	soc {
 		compatible = "simple-bus";
 		#address-cells = <2>;
@@ -123,6 +131,40 @@
 			interrupt-parent = <&plic>;
 			interrupts = <2>;
 			local-mac-address = [02 00 00 fa b1 e5];
+		};
+
+		/* LEDs, switches, build identifier; and the register that reloads the FPGA */
+		board: syscon@20000000 {
+			compatible = "legend,board", "syscon";
+			reg = <0x0 0x20000000 0x0 0x100>;
+			reg-io-width = <4>;
+		};
+
+		/*
+		 * The FPGA's configuration flash (128 MiB, 16 bits wide) through an
+		 * asynchronous bus bridge. Switch SW11 drives its top two address
+		 * lines, so the window is the 32 MiB image the board boots from.
+		 */
+		flash@60000000 {
+			compatible = "cfi-flash";
+			reg = <0x0 0x60000000 0x0 0x02000000>;
+			bank-width = <2>;
+
+			partitions {
+				compatible = "fixed-partitions";
+				#address-cells = <1>;
+				#size-cells = <1>;
+
+				partition@0 {
+					label = "bitstream";
+					reg = <0x00000000 0x01400000>;
+				};
+				partition@1400000 {
+					/* JFFS2: a kernel and a small root for when the network is away */
+					label = "reserve";
+					reg = <0x01400000 0x00c00000>;
+				};
+			};
 		};
 	};
 };

@@ -45,7 +45,8 @@ module tb;
       .clk, .rst, .reg_sel, .reg_we, .reg_addr, .reg_wdata, .reg_rdata, .irq,
       .e_req, .e_we, .e_addr, .e_wdata, .e_be, .e_gnt, .e_rvalid, .e_rdata,
       .mac_clk, .mac_rst(rst), .mac_tx_clk, .mac_tx_rst(rst), .tx_pcs_frames(16'h0), .rx_tdata, .rx_tvalid, .rx_tlast, .rx_tuser(1'b0),
-      .tx_tdata, .tx_tvalid, .tx_tlast, .tx_tready, .pcs_status(16'h0001)
+      .tx_tdata, .tx_tvalid, .tx_tlast, .tx_tready, .pcs_status(16'h0001),
+      .fl_addr(), .fl_dq_i(16'hffff), .fl_dq_o(), .fl_dq_t(), .fl_ce_n(), .fl_oe_n(), .fl_we_n(), .fl_adv_n(), .reconfig()
   );
 
   int nframes = 400, errors = 0;

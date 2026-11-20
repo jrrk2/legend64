@@ -42,7 +42,8 @@ module tb;
       .mem_req, .mem_we, .mem_addr, .mem_wdata, .mem_ack, .mem_rdata,
       .uart_tx, .uart_rx, .led, .dip(8'h00), .btn(5'h0),
       .mac_clk(clk), .mac_rst(rst), .mac_tx_clk(clk), .mac_tx_rst(rst), .tx_pcs_frames(16'h0), .rx_tdata, .rx_tvalid, .rx_tlast, .rx_tuser(1'b0),
-      .tx_tdata, .tx_tvalid, .tx_tlast, .tx_tready(1'b1), .pcs_status(16'h0c03)
+      .tx_tdata, .tx_tvalid, .tx_tlast, .tx_tready(1'b1), .pcs_status(16'h0c03),
+      .fl_addr(), .fl_dq_i(16'hffff), .fl_dq_o(), .fl_dq_t(), .fl_ce_n(), .fl_oe_n(), .fl_we_n(), .fl_adv_n(), .reconfig()
   );
 
   // ---------------------------------------------------------------- Ethernet peer

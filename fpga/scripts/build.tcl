@@ -23,6 +23,7 @@ read_verilog -sv [list \
     $root/fpga/rtl/legend_uart16550.sv $root/fpga/rtl/legend_plic.sv $root/fpga/rtl/legend_eth.sv \
     $root/fpga/rtl/legend_ram.sv $root/fpga/rtl/legend_cache.sv $root/fpga/rtl/mig_line_adapter.sv $root/fpga/rtl/litedram_line_adapter.sv \
     $root/fpga/rtl/legend64_soc.sv $root/fpga/rtl/legend64_vc707.sv $root/fpga/rtl/legend_sgmii.sv \
+    $root/fpga/rtl/legend_flash.sv $root/fpga/rtl/legend_reconfig.sv \
     $eth/eth_mac_1g.sv $eth/axis_gmii_rx.sv $root/fpga/third_party/verilog-ethernet/axis_gmii_tx.sv $eth/rgmii_lfsr.sv]
 read_verilog [list $eth/liteeth_sgmii_phy.v]
 if {$litedram} {

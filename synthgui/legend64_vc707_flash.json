@@ -1,0 +1,24 @@
+{
+  "device": "xc7vx485t",
+  "part": "xc7vx485tffg1761-2",
+  "family": "virtex7",
+  "openfpgaloader": "{prefix}/bin/openFPGALoader",
+  "name": "legend64 Vivado build (1 MiB cache, reset branches, TFTP boot monitor) to the VC707 BPI flash",
+  "top": "legend64_vc707",
+  "work": "/home/jonathan/riscv/build/synthgui/flash",
+  "sources": [],
+  "bpi_bridge_dir": "/home/jonathan/synthgui/runs/2026-11-11-matrix/w/vc707_bpi_bridge",
+  "steps": [
+    {
+      "id": "program",
+      "label": "Program",
+      "command": "{openfpgaloader} --cable digilent --freq 15000000 {bit}"
+    },
+    {
+      "id": "program_flash",
+      "label": "Program (BPI flash)",
+      "command": "OPENFPGALOADER_SOJ_DIR={bpi_bridge_dir} {openfpgaloader} -b vc707 -f {bit}",
+      "nonvolatile": true
+    }
+  ]
+}

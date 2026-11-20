@@ -15,7 +15,8 @@ module legend64_vc707 #(
     parameter              BOOT_HEX = "boot.hex",
     parameter int          CACHE_LINES_LOG2 = 10,
     parameter int          TLB_ENTRIES      = 8,
-    parameter int          TX_IFG           = 12     // Ethernet transmit inter-frame gap, bytes
+    parameter int          TX_IFG           = 12,    // Ethernet transmit inter-frame gap, bytes
+    parameter bit          RECONFIG         = 1'b1   // software can reload the FPGA from flash (ICAPE2)
 ) (
     input  wire        sys_clk_p,
     input  wire        sys_clk_n,
@@ -48,7 +49,16 @@ module legend64_vc707 #(
     output wire        sgmii_txn,
     input  wire        sgmii_refclk_p,
     input  wire        sgmii_refclk_n,
-    output wire        eth_rst_n
+    output wire        eth_rst_n,
+
+    // the configuration flash (linear BPI, 16 bits wide). The two address lines above these
+    // belong to switch SW11, which picks one of four 32 MiB images.
+    output wire [23:0] bpi_addr,        // bit n is flash pin A<n+1>
+    inout  wire [15:0] bpi_dq,
+    output wire        bpi_ce_n,
+    output wire        bpi_oe_n,
+    output wire        bpi_we_n,
+    output wire        bpi_adv_n
 );
   // ------------------------------------------------------------------ memory controller
   // Either the Xilinx memory interface (calibrates itself in hardware) or a LiteDRAM core
@@ -151,8 +161,10 @@ module legend64_vc707 #(
   always @(posedge clk_sys or negedge mmcm_locked)
     if (!mmcm_locked) rst_sync <= 4'hf;
     else              rst_sync <= {rst_sync[2:0], 1'b0};
-  always @(posedge clk_sys) calib_sync <= {calib_sync[0], calib_done};
   wire rst_sys   = rst_sync[3];
+  always @(posedge clk_sys)
+    if (rst_sys) calib_sync <= 2'b00;
+    else         calib_sync <= {calib_sync[0], calib_done};
   wire ddr_ready = calib_sync[1];   // LED only when LITEDRAM: the core must run to get there
 
   // ------------------------------------------------------------------ Ethernet PHY and MAC
@@ -175,7 +187,9 @@ module legend64_vc707 #(
   );
 
   // ------------------------------------------------------------------ the system
-  wire [7:0] soc_led;
+  wire [7:0]  soc_led;
+  wire [15:0] fl_dq_i, fl_dq_o;
+  wire        fl_dq_t, reconfig;
   legend64_soc #(.CLK_HZ(CLK_HZ), .BUILD_ID(BUILD_ID), .BOOT_HEX(BOOT_HEX),
                 .CACHE_LINES_LOG2(CACHE_LINES_LOG2), .TLB_ENTRIES(TLB_ENTRIES)) u_soc (
       .clk(clk_sys), .rst(rst_sys), .ddr_ready(ddr_ready || LITEDRAM), .ddr_soft(LITEDRAM),
@@ -184,11 +198,27 @@ module legend64_vc707 #(
       .uart_tx(UART_TX), .uart_rx(UART_RX), .led(soc_led), .dip(GPIO_DIP_SW), .btn(GPIO_SW),
       .mac_clk(eth_rx_clk), .mac_rst(eth_rx_rst), .mac_tx_clk(eth_tx_clk), .mac_tx_rst(eth_tx_rst), .tx_pcs_frames,
       .rx_tdata, .rx_tvalid, .rx_tlast, .rx_tuser, .tx_tdata, .tx_tvalid, .tx_tlast, .tx_tready,
-      .pcs_status(pcspma_status)
+      .pcs_status(pcspma_status),
+      .fl_addr(bpi_addr), .fl_dq_i, .fl_dq_o, .fl_dq_t, .fl_ce_n(bpi_ce_n), .fl_oe_n(bpi_oe_n),
+      .fl_we_n(bpi_we_n), .fl_adv_n(bpi_adv_n), .reconfig
   );
 
-  // LED7 heartbeat on the system clock, LED6 memory calibrated, LED5 Ethernet link, 4:0 software
-  reg [24:0] hb = 0;
-  always @(posedge clk_sys) hb <= hb + 1'b1;
+  genvar gi;
+  generate
+    for (gi = 0; gi < 16; gi = gi + 1) begin : g_dq
+      IOBUF u_iobuf (.IO(bpi_dq[gi]), .I(fl_dq_o[gi]), .T(fl_dq_t), .O(fl_dq_i[gi]));
+    end
+    if (RECONFIG) begin : g_reconfig
+      legend_reconfig u_reconfig (.clk(clk_sys), .rst(rst_sys), .go(reconfig));
+    end
+  endgenerate
+
+  // LED7 heartbeat on the system clock, LED6 memory calibrated, LED5 Ethernet link, 4:0 software.
+  // The heartbeat is held at zero until the clock generator reports lock, so a flashing LED7 says
+  // both that the clock runs and that the system reset has been released.
+  reg [24:0] hb;
+  always @(posedge clk_sys or negedge mmcm_locked)
+    if (!mmcm_locked) hb <= 25'd0;
+    else              hb <= hb + 1'b1;
   assign LED = {hb[24], ddr_ready, pcspma_status[0], soc_led[4:0]};
 endmodule
