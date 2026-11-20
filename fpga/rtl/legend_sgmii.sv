@@ -10,7 +10,9 @@
 // nothing sits between PCS and MAC: frames can follow each other at the minimum gap in both
 // directions, and the clock crossing is done by legend_eth's FIFOs.
 `default_nettype none
-module legend_sgmii (
+module legend_sgmii #(
+    parameter [7:0] TX_IFG = 8'd12       // idle bytes the MAC leaves between frames (12 is the standard's minimum)
+) (
     input  wire        clk_int,          // free-running clock for the PHY's reset sequencing
     input  wire        rst_int,
 
@@ -29,6 +31,7 @@ module legend_sgmii (
     input  wire        tx_axis_tvalid,
     input  wire        tx_axis_tlast,
     output wire        tx_axis_tready,
+    output wire [15:0] tx_frames_out,    // frames started on the GMII output, wraps
 
     // receive stream, on rx_clk; tuser with tlast marks a bad frame
     output wire        rx_clk,
@@ -74,7 +77,7 @@ module legend_sgmii (
       .gmii_txd(gmii_txd), .gmii_tx_en(gmii_tx_en), .gmii_tx_er(),
       .rx_clk_enable(1'b1), .tx_clk_enable(1'b1), .rx_mii_select(1'b0), .tx_mii_select(1'b0),
       .rx_error_bad_frame(), .rx_error_bad_fcs(), .rx_fcs_reg(), .tx_fcs_reg(),
-      .ifg_delay(8'd12)
+      .ifg_delay(TX_IFG)
   );
 
   assign phy_reset_n = ~rst_int;
@@ -83,11 +86,13 @@ module legend_sgmii (
   reg [25:0] hb_tx = 0, hb_rx = 0;
   reg        txen_seen = 0, rxdv_seen = 0, txen_q = 0;
   reg [3:0]  tx_frames = 0;
+  reg [15:0] tx_frames16 = 0;
+  assign tx_frames_out = tx_frames16;
   always @(posedge tx_clk) begin
     hb_tx  <= hb_tx + 1'b1;
     txen_q <= gmii_tx_en;
     if (gmii_tx_en) txen_seen <= 1'b1;
-    if (gmii_tx_en && !txen_q) tx_frames <= tx_frames + 1'b1;
+    if (gmii_tx_en && !txen_q) begin tx_frames <= tx_frames + 1'b1; tx_frames16 <= tx_frames16 + 1'b1; end
   end
   always @(posedge rx_clk) begin
     hb_rx <= hb_rx + 1'b1;

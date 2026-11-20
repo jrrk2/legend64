@@ -42,14 +42,24 @@ fi
 (head -c 8000000 $tree$big | nc -N -l 5004) &
 want=$(head -c 8000000 $tree$big | sha256sum | cut -d' ' -f1)
 sleep 1
-timeout 600 $S "uname -v; grep ' / ' /proc/mounts | cut -d' ' -f4 | cut -c1-60; uptime
+# The first test on its own, between two readings of this host's receive counter, to see whether
+# the frames the board's driver counted as sent arrived here.
+hostdev=$(ip -br addr | awk -v h=$H '$0 ~ h"/" {print $1}')
+h0=$(cat /sys/class/net/$hostdev/statistics/rx_packets)
+# the Ethernet interface is whatever the system calls it (end0 under Debian on legend64)
+IFQ='IF=$(ls /sys/class/net | grep -v "^lo$" | head -1)'
+timeout 300 $S "$IFQ; uname -v; grep ' / ' /proc/mounts | cut -d' ' -f4 | cut -c1-60; uptime
+t0=\$(cat /sys/class/net/\$IF/statistics/tx_packets)
 echo '== iperf3, board sends';    iperf3 -c $H -p 5201 -t 10 | tail -4 | head -2
+echo \"frames the board's driver counted as sent: \$(( \$(cat /sys/class/net/\$IF/statistics/tx_packets) - t0 ))\""
+echo "frames this host received meanwhile (all sources): $(( $(cat /sys/class/net/$hostdev/statistics/rx_packets) - h0 ))"
+timeout 600 $S "$IFQ
 echo '== iperf3, board receives'; iperf3 -c $H -p 5202 -t 10 -R | tail -4 | head -2
 echo '== 8 MB to the host';       head -c 8000000 $big > /dev/tcp/$H/5003
 echo '== 8 MB from the host';     sha256sum < /dev/tcp/$H/5004
 echo '== cold NFS read';          dd if=$cold of=/dev/null bs=64k 2>&1 | tail -1
 echo '== one yescrypt password hash'; ( time -p perl -e 'crypt(q(test), q(\$y\$j9T\$abcdefghijklmnop\$))' ) 2>&1 | tr '\n' ' '; echo
-ip -s -s link show end0 | sed -n 3,10p
+ip -s -s link show \$IF | sed -n 3,10p
 grep -E '^Tcp:' /proc/net/snmp | tail -1"
 sleep 1
 echo "8 MB to the host arrived as $(cat $ctl.tx 2>/dev/null)"

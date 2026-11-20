@@ -8,6 +8,13 @@
 //   +frames=<n>   frames each way (default 400)     +verilator+seed+<n>
 //   +slowrx       be slow to return receive descriptors, so the hardware has to drop frames
 //   +slowmem      grant the memory port rarely, so the receive FIFO fills (build with a small one)
+// Built with -DREAL_MAC the transmit stream goes through the real byte-stream MAC (eth_mac_1g,
+// from third_party/synthgui/projects/vc707_ethmin-src) and what is checked is its GMII output:
+// preamble, frame, padding and FCS, and that it never flags a transmit error.
+//   +minlen=<n>   no transmit frame shorter than n bytes (the real MAC cannot send a frame of
+//                 one or two bytes: it takes two bytes before it looks at tlast)
+//   +fastmem      memory always grants and answers in the next cycle, like a cache hit: frames
+//                 then reach the transmit FIFO faster than the MAC takes them, and it fills
 `timescale 1ns / 1ps
 `ifndef RX_FIFO_AW
 `define RX_FIFO_AW 14          // +define+RX_FIFO_AW=8 makes the FIFO, not the ring, overflow
@@ -27,21 +34,27 @@ module tb;
   logic [29:0] e_addr;
   logic [63:0] e_wdata, e_rdata = 0;
   logic [7:0]  e_be, rx_tdata = 0, tx_tdata;
-  logic        rx_tvalid = 0, rx_tlast = 0, tx_tvalid, tx_tlast, tx_tready = 1;
+  logic        rx_tvalid = 0, rx_tlast = 0, tx_tvalid, tx_tlast;
+`ifdef REAL_MAC
+  wire         tx_tready;
+`else
+  logic        tx_tready = 1;
+`endif
 
   legend_eth #(.RX_FIFO_AW(RX_FIFO_AW)) dut (
       .clk, .rst, .reg_sel, .reg_we, .reg_addr, .reg_wdata, .reg_rdata, .irq,
       .e_req, .e_we, .e_addr, .e_wdata, .e_be, .e_gnt, .e_rvalid, .e_rdata,
-      .mac_clk, .mac_rst(rst), .mac_tx_clk, .mac_tx_rst(rst), .rx_tdata, .rx_tvalid, .rx_tlast, .rx_tuser(1'b0),
+      .mac_clk, .mac_rst(rst), .mac_tx_clk, .mac_tx_rst(rst), .tx_pcs_frames(16'h0), .rx_tdata, .rx_tvalid, .rx_tlast, .rx_tuser(1'b0),
       .tx_tdata, .tx_tvalid, .tx_tlast, .tx_tready, .pcs_status(16'h0001)
   );
 
   int nframes = 400, errors = 0;
-  bit slow_rx = 0, slow_mem = 0;
+  bit slow_rx = 0, slow_mem = 0, fast_mem = 0;
+  int min_len = 1;               // +minlen=<n>: no transmit frame shorter than this
   localparam int MEMSZ = 1 << 20;
   logic [7:0] mem[MEMSZ];
   localparam int RX_RING = 32'h1000, TX_RING = 32'h2000, RX_BUF = 32'h10000, TX_AREA = 32'h40000;
-  localparam int NRING = 16;
+  localparam int NRING = 64;
   localparam logic [47:0] MAC = 48'h0605_0403_0201;   // bytes 01 02 03 04 05 06 on the wire
 
   function automatic logic [63:0] rd64(input int a);
@@ -58,14 +71,16 @@ module tb;
   logic [29:0] rd_addr;
   assign e_gnt = e_req && gnt_ok && rd_wait == 0;
   always @(posedge clk) begin
-    gnt_ok   <= slow_mem ? $urandom_range(0, 15) == 0 : $urandom_range(0, 3) != 0;
+    gnt_ok   <= fast_mem ? 1'b1 : slow_mem ? $urandom_range(0, 15) == 0 : $urandom_range(0, 3) != 0;
     e_rvalid <= 0;
     if (e_req && e_gnt) begin
       if (e_addr[2:0] != 0) begin $display("ERROR: unaligned memory address %h", e_addr); errors++; end
       if (e_we) begin
         for (int i = 0; i < 8; i++) if (e_be[i]) mem[int'(e_addr) + i] = e_wdata[8*i+:8];
       end else begin
-        rd_addr <= e_addr; rd_wait <= $urandom_range(1, 3);
+        // +fastmem: as the cache does on a hit, the data is there in the cycle after the grant
+        if (fast_mem) begin e_rvalid <= 1; e_rdata <= rd64(int'(e_addr)); end
+        else begin rd_addr <= e_addr; rd_wait <= $urandom_range(1, 3); end
       end
     end
     if (rd_wait != 0) begin
@@ -106,11 +121,81 @@ module tb;
   logic [7:0] exp_data[$][];
   int         tx_checked = 0, tx_sent = 0, tx_discards = 0, tx_csums = 0, tx_multi = 0;
 
+`ifdef REAL_MAC
+  // ---- the real MAC between the front end and the checker
+  wire [7:0] gmii_txd;
+  wire       gmii_tx_en, gmii_tx_er, mac_tready;
+  assign tx_tready = mac_tready;
+  eth_mac_1g #(.ENABLE_PADDING(1), .MIN_FRAME_LENGTH(64)) u_mac (
+      .rx_clk(mac_clk), .rx_rst(rst), .tx_clk(mac_tx_clk), .tx_rst(rst),
+      .tx_axis_tdata(tx_tdata), .tx_axis_tvalid(tx_tvalid), .tx_axis_tready(mac_tready),
+      .tx_axis_tlast(tx_tlast), .tx_axis_tuser(1'b0),
+      .rx_axis_tdata(), .rx_axis_tvalid(), .rx_axis_tlast(), .rx_axis_tuser(),
+      .gmii_rxd(8'h0), .gmii_rx_dv(1'b0), .gmii_rx_er(1'b0),
+      .gmii_txd(gmii_txd), .gmii_tx_en(gmii_tx_en), .gmii_tx_er(gmii_tx_er),
+      .rx_clk_enable(1'b1), .tx_clk_enable(1'b1), .rx_mii_select(1'b0), .tx_mii_select(1'b0),
+      .rx_error_bad_frame(), .rx_error_bad_fcs(), .rx_fcs_reg(), .tx_fcs_reg(), .ifg_delay(8'd12));
+
+  function automatic logic [31:0] crc32(input logic [7:0] d[$], input int n);
+    logic [31:0] c = 32'hffff_ffff;
+    for (int i = 0; i < n; i++) begin
+      c = c ^ {24'b0, d[i]};
+      for (int k = 0; k < 8; k++) c = c[0] ? (c >> 1) ^ 32'hedb8_8320 : c >> 1;
+    end
+    return ~c;
+  endfunction
+
+  logic [7:0] g[$];
+  logic       en_q = 0;
+  int         gmii_errs = 0, gap = 100, min_gap = 100000;
+  always @(posedge mac_tx_clk) begin
+    en_q <= gmii_tx_en;
+    if (gmii_tx_en && gmii_tx_er) begin
+      gmii_errs++;
+      if (gmii_errs <= 5) $display("ERROR: the MAC flagged a transmit error in frame %0d (it saw its input go idle inside a frame)", tx_checked);
+      errors++;
+    end
+    if (gmii_tx_en) begin
+      if (!en_q && gap < min_gap) min_gap = gap;
+      g.push_back(gmii_txd); gap = 0;
+    end else begin
+      gap++;
+      if (en_q) begin
+        automatic int n = g.size() - 12;          // without preamble and FCS
+        automatic bit bad = 0;
+        for (int i = 0; i < 7; i++) if (g[i] !== 8'h55) bad = 1;
+        if (bad || g[7] !== 8'hd5) begin $display("ERROR: tx frame %0d: bad preamble", tx_checked); errors++; end
+        for (int i = 0; i < 8; i++) void'(g.pop_front());
+        if (n < 60) begin $display("ERROR: tx frame %0d: %0d bytes on the wire before the FCS", tx_checked, n); errors++; end
+        else begin
+          automatic logic [31:0] c = crc32(g, n);
+          if ({g[n + 3], g[n + 2], g[n + 1], g[n]} !== c) begin $display("ERROR: tx frame %0d: bad FCS", tx_checked); errors++; end
+        end
+        if (exp_data.size() == 0) begin $display("ERROR: unexpected frame of %0d bytes", n); errors++; end
+        else begin
+          automatic logic [7:0] e[] = exp_data.pop_front();
+          automatic int nbad = 0, want = e.size() < 60 ? 60 : e.size();
+          if (want != n) begin
+            $display("ERROR: tx frame %0d: %0d bytes, expected %0d", tx_checked, n, want); errors++;
+          end else begin
+            for (int i = 0; i < n; i++) if ((i < e.size() ? e[i] : 8'h00) !== g[i]) begin
+              if (nbad < 4) $display("ERROR: tx frame %0d byte %0d of %0d: %02x, expected %02x", tx_checked, i, n, g[i], i < e.size() ? e[i] : 8'h00);
+              nbad++;
+            end
+            if (nbad != 0) errors++;
+          end
+        end
+        tx_checked++;
+        g.delete();
+      end
+    end
+  end
+`else
   // what comes out of the MAC side
   logic [7:0] got[$];
   logic       in_frame = 0;
   always @(posedge mac_tx_clk) begin
-    tx_tready <= $urandom_range(0, 7) != 0;
+    tx_tready <= fast_mem ? 1'b1 : $urandom_range(0, 7) != 0;
     if (in_frame && !tx_tvalid) begin $display("ERROR: gap inside a transmitted frame"); errors++; end
     if (tx_tvalid && tx_tready) begin
       got.push_back(tx_tdata);
@@ -136,6 +221,7 @@ module tb;
     end
   end
 
+`endif
   int tx_sw_head = 0, tx_alloc = TX_AREA;
   task automatic tx_frame();
     automatic int ndesc = $urandom_range(0, 9) < 5 ? 1 : $urandom_range(2, 4);
@@ -148,6 +234,7 @@ module tb;
     else if (kind < 6)  total = $urandom_range(1, 80);
     else if (kind < 10) total = $urandom_range(1400, 1518);
     else                total = $urandom_range(1, 1518);
+    if (total < min_len) total = min_len;
     discard = total > 1518;
     f = new[total];
     for (int i = 0; i < total; i++) f[i] = 8'($urandom);
@@ -200,7 +287,8 @@ module tb;
   initial begin : tx_thread
     wait (up);
     while (tx_sent < nframes) begin
-      automatic int batch = $urandom_range(1, 3), first = tx_sw_head, expect_out;
+      // up to twelve frames at once: more than the transmit FIFO holds
+      automatic int batch = $urandom_range(0, 3) == 0 ? $urandom_range(4, 12) : $urandom_range(1, 3), first = tx_sw_head, expect_out;
       for (int b = 0; b < batch; b++) tx_frame();
       tx_tail_v = 16'(tx_sw_head); tx_tail_req = 1;
       wait (!tx_tail_req);
@@ -299,6 +387,8 @@ module tb;
     void'($value$plusargs("frames=%d", nframes));
     slow_rx = $test$plusargs("slowrx");
     slow_mem = $test$plusargs("slowmem");
+    fast_mem = $test$plusargs("fastmem");
+    void'($value$plusargs("minlen=%d", min_len));
     for (int i = 0; i < MEMSZ; i++) mem[i] = 8'($urandom);
     for (int i = 0; i < NRING; i++) begin
       wr64(RX_RING + 16 * i, 64'(RX_BUF + 2048 * i));
@@ -324,6 +414,11 @@ module tb;
              rx_long, dut.cnt_long, dut.cnt_fifo, 32'(dut.cnt_fifo) + dut.rx_dropped);
     if (32'(dut.cnt_long) != rx_long) begin $display("ERROR: long frame count"); errors++; end
     if (32'(dut.cnt_fifo) + dut.rx_dropped != rx_skipped + rxf.size()) begin $display("ERROR: drop counters do not add up"); errors++; end
+`ifdef REAL_MAC
+    $display("          through the real MAC: %0d transmit errors flagged, shortest gap between frames %0d byte times", gmii_errs, min_gap);
+    // 802.3: at least 12 byte times of idle between frames; a PHY or switch may drop what follows less
+    if (min_gap < 12) begin $display("ERROR: inter-frame gap of %0d byte times, under the minimum of 12", min_gap); errors++; end
+`endif
     if (tx_checked != tx_sent - tx_discards) begin $display("ERROR: transmit count"); errors++; end
     if (rx_checked + rx_skipped + rxf.size() != rx_put) begin $display("ERROR: receive count"); errors++; end
     if (errors == 0) $display("PASS"); else $display("FAIL: %0d errors", errors);

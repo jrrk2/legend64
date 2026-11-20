@@ -14,7 +14,8 @@ module legend64_vc707 #(
     parameter logic [31:0] BUILD_ID = 32'h0,
     parameter              BOOT_HEX = "boot.hex",
     parameter int          CACHE_LINES_LOG2 = 10,
-    parameter int          TLB_ENTRIES      = 8
+    parameter int          TLB_ENTRIES      = 8,
+    parameter int          TX_IFG           = 12     // Ethernet transmit inter-frame gap, bytes
 ) (
     input  wire        sys_clk_p,
     input  wire        sys_clk_n,
@@ -160,12 +161,14 @@ module legend64_vc707 #(
   wire [15:0] pcspma_status;
 
   wire eth_rx_clk, eth_rx_rst, eth_tx_clk, eth_tx_rst;
-  legend_sgmii u_eth (
+  wire [15:0] tx_pcs_frames;
+  legend_sgmii #(.TX_IFG(8'(TX_IFG))) u_eth (
       .clk_int(clk_sys), .rst_int(rst_sys),
       .sgmii_rxp, .sgmii_rxn, .sgmii_txp, .sgmii_txn, .sgmii_refclk_p, .sgmii_refclk_n,
       .phy_reset_n(eth_rst_n),
       .tx_clk(eth_tx_clk), .tx_rst(eth_tx_rst),
       .tx_axis_tdata(tx_tdata), .tx_axis_tvalid(tx_tvalid), .tx_axis_tlast(tx_tlast), .tx_axis_tready(tx_tready),
+      .tx_frames_out(tx_pcs_frames),
       .rx_clk(eth_rx_clk), .rx_rst(eth_rx_rst),
       .rx_axis_tdata(rx_tdata), .rx_axis_tvalid(rx_tvalid), .rx_axis_tlast(rx_tlast), .rx_axis_tuser(rx_tuser),
       .pcspma_status(pcspma_status)
@@ -179,7 +182,7 @@ module legend64_vc707 #(
       .mem_req, .mem_we, .mem_addr, .mem_wdata, .mem_ack, .mem_rdata,
       .dcsr_req, .dcsr_we, .dcsr_addr, .dcsr_wdata, .dcsr_ack, .dcsr_rdata,
       .uart_tx(UART_TX), .uart_rx(UART_RX), .led(soc_led), .dip(GPIO_DIP_SW), .btn(GPIO_SW),
-      .mac_clk(eth_rx_clk), .mac_rst(eth_rx_rst), .mac_tx_clk(eth_tx_clk), .mac_tx_rst(eth_tx_rst),
+      .mac_clk(eth_rx_clk), .mac_rst(eth_rx_rst), .mac_tx_clk(eth_tx_clk), .mac_tx_rst(eth_tx_rst), .tx_pcs_frames,
       .rx_tdata, .rx_tvalid, .rx_tlast, .rx_tuser, .tx_tdata, .tx_tvalid, .tx_tlast, .tx_tready,
       .pcs_status(pcspma_status)
   );

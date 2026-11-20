@@ -22,10 +22,16 @@
 //   0x50 TX_TAIL     (write) one past the last descriptor ready to send
 //   0x60 RX_DROPPED  frames dropped, wraps
 //   0x64 FEATURES    (read) bit0 receive checksum, bit1 transmit frames of several descriptors,
-//                    bit2 transmit checksum insertion, bit3 the three counters below
+//                    bit2 transmit checksum insertion, bit3 the three receive counters below,
+//                    bit4 the four transmit counters
 //   0x68 RX_FIFO     frames lost because the receive FIFO was full          (16 bits, wrap)
 //   0x6c RX_BAD      frames the MAC marked bad (FCS error, bad symbol)       (16 bits, wrap)
 //   0x70 RX_LONG     frames over 1518 bytes, discarded                       (16 bits, wrap)
+//   Transmit frames counted at four points on their way out (FEATURES bit4; 16 bits, wrap):
+//   0x74 TX_QUEUED   frames put whole into the transmit FIFO
+//   0x78 TX_DISCARD  frames given up (too long, empty, or transmission switched off part way)
+//   0x7c TX_MAC      frames handed to the MAC, last byte accepted
+//   0x80 TX_PCS      frames the MAC started on its GMII output (counted by the PHY wrapper)
 //
 // Descriptor, 16 bytes:  +0  u64 buffer physical address
 //                        +8  u32 length, +12 u32 flags (bit0 DONE, written by the hardware)
@@ -159,6 +165,7 @@ module legend_eth #(
     output logic        tx_tvalid,
     output logic        tx_tlast,
     input  logic        tx_tready,
+    input  logic [15:0] tx_pcs_frames,   // on mac_tx_clk: frames started on the GMII output
     input  logic [15:0] pcs_status
 );
   // ------------------------------------------------------------------ registers
@@ -169,6 +176,7 @@ module legend_eth #(
   logic [15:0] rx_size, tx_size, rx_head, rx_tail, tx_head, tx_tail;
   logic [31:0] rx_dropped;
   logic [15:0] cnt_fifo, cnt_bad, cnt_long;    // from the MAC clock domain
+  logic [15:0] cnt_txq, cnt_txdisc, cnt_txmac, cnt_txpcs;
   logic        ev_rx, ev_tx, ev_drop, rx_adv, tx_adv;
   (* ASYNC_REG = "TRUE" *) logic [1:0] link_s;
 
@@ -226,7 +234,11 @@ module legend_eth #(
           8'h4c: reg_rdata <= {16'b0, tx_head};
           8'h50: reg_rdata <= {16'b0, tx_tail};
           8'h60: reg_rdata <= rx_dropped;
-          8'h64: reg_rdata <= 32'hf;
+          8'h64: reg_rdata <= 32'h1f;
+          8'h74: reg_rdata <= {16'b0, cnt_txq};
+          8'h78: reg_rdata <= {16'b0, cnt_txdisc};
+          8'h7c: reg_rdata <= {16'b0, cnt_txmac};
+          8'h80: reg_rdata <= {16'b0, cnt_txpcs};
           8'h68: reg_rdata <= {16'b0, cnt_fifo};
           8'h6c: reg_rdata <= {16'b0, cnt_bad};
           8'h70: reg_rdata <= {16'b0, cnt_long};
@@ -465,6 +477,7 @@ module legend_eth #(
     ev_tx <= 1'b0; tx_adv <= 1'b0; s1_v <= 1'b0;
     if (rst) begin
       t_state <= T_IDLE; pk_fill <= '0; pk_pend_v <= 1'b0; pk_acc <= '0;
+      cnt_txq <= '0; cnt_txdisc <= '0;
     end else begin
       if (s1_v) begin
         if (pk_tot >= 5'd8) begin
@@ -518,7 +531,10 @@ module legend_eth #(
         end
         T_FOLD:  begin cs_fold <= 17'(cs_sum[15:0]) + 17'(cs_sum[27:16]); t_state <= T_PATCH; end
         T_PATCH: t_state <= T_END;
-        T_END:   begin ev_tx <= 1'b1; t_state <= T_IDLE; end
+        T_END:   begin
+          ev_tx <= 1'b1; t_state <= T_IDLE;
+          if (t_abort) cnt_txdisc <= cnt_txdisc + 16'd1; else cnt_txq <= cnt_txq + 16'd1;
+        end
         default: t_state <= T_IDLE;
       endcase
     end
@@ -544,6 +560,13 @@ module legend_eth #(
   assign tx_tdata     = txu_cur[{txu_idx[2:0], 3'b000}+:8];
   assign tx_tlast     = txu_cur[71] && txu_lastbyte;
   assign txf_rready   = txf_rvalid && (!txu_run || (tx_tready && txu_lastbyte && !txu_cur[71]));
+  logic [15:0] m_txmac;
+  legend_sync_val #(.W(16)) u_ctm (.src_clk(mac_tx_clk), .src_val(m_txmac), .dst_clk(clk), .dst_val(cnt_txmac));
+  legend_sync_val #(.W(16)) u_ctp (.src_clk(mac_tx_clk), .src_val(tx_pcs_frames), .dst_clk(clk), .dst_val(cnt_txpcs));
+  always_ff @(posedge mac_tx_clk) begin
+    if (mac_tx_rst) m_txmac <= '0;
+    else if (tx_tvalid && tx_tready && tx_tlast) m_txmac <= m_txmac + 16'd1;
+  end
   always_ff @(posedge mac_tx_clk) begin
     if (mac_tx_rst) begin
       txu_run <= 1'b0; txu_idx <= '0;

@@ -25,7 +25,7 @@ module tb;
       .dcsr_req, .dcsr_we, .dcsr_addr, .dcsr_wdata, .dcsr_ack, .dcsr_rdata,
       .mem_req, .mem_we, .mem_addr, .mem_wdata, .mem_ack, .mem_rdata,
       .uart_tx, .uart_rx(1'b1), .led, .dip(8'h00), .btn(5'h0),
-      .mac_clk, .mac_rst(rst), .mac_tx_clk(mac_clk), .mac_tx_rst(rst), .rx_tdata(8'h0), .rx_tvalid(1'b0), .rx_tlast(1'b0), .rx_tuser(1'b0),
+      .mac_clk, .mac_rst(rst), .mac_tx_clk(mac_clk), .mac_tx_rst(rst), .tx_pcs_frames(16'h0), .rx_tdata(8'h0), .rx_tvalid(1'b0), .rx_tlast(1'b0), .rx_tuser(1'b0),
       .tx_tdata, .tx_tvalid, .tx_tlast, .tx_tready(1'b1), .pcs_status(16'h0c03)
   );
 

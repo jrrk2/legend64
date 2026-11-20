@@ -53,6 +53,7 @@ module legend64_soc #(
     input  logic         mac_rst,
     input  logic         mac_tx_clk,   // and its transmit side
     input  logic         mac_tx_rst,
+    input  logic [15:0]  tx_pcs_frames,
     input  logic [7:0]   rx_tdata,
     input  logic         rx_tvalid,
     input  logic         rx_tlast,
@@ -173,7 +174,7 @@ module legend64_soc #(
       .reg_rdata(eth_q), .irq(eth_irq),
       .e_req, .e_we, .e_addr, .e_wdata, .e_be, .e_gnt, .e_rvalid, .e_rdata,
       .mac_clk, .mac_rst, .mac_tx_clk, .mac_tx_rst, .rx_tdata, .rx_tvalid, .rx_tlast, .rx_tuser,
-      .tx_tdata, .tx_tvalid, .tx_tlast, .tx_tready, .pcs_status
+      .tx_tdata, .tx_tvalid, .tx_tlast, .tx_tready, .tx_pcs_frames, .pcs_status
   );
 
   assign irq_timer = mtime >= mtimecmp;

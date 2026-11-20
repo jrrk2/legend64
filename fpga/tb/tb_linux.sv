@@ -17,6 +17,8 @@
 //   +tcpsink   instead, be a TCP server that accepts any connection, acknowledges what arrives
 //              in order and reports anything that arrives out of order: a segment the SoC
 //              should have sent and did not shows up here as a gap
+//   +sinkdelay=<cycles>   the sink's replies leave that much later (15000 is 0.3 ms, a LAN round
+//              trip), so the sender runs ahead of its acknowledgements and sends in bursts
 `timescale 1ns / 1ps
 module tb;
   logic clk = 0, rst = 1;
@@ -39,7 +41,7 @@ module tb;
       .dcsr_req(), .dcsr_we(), .dcsr_addr(), .dcsr_wdata(), .dcsr_ack(1'b0), .dcsr_rdata(32'h0),
       .mem_req, .mem_we, .mem_addr, .mem_wdata, .mem_ack, .mem_rdata,
       .uart_tx, .uart_rx, .led, .dip(8'h00), .btn(5'h0),
-      .mac_clk(clk), .mac_rst(rst), .mac_tx_clk(clk), .mac_tx_rst(rst), .rx_tdata, .rx_tvalid, .rx_tlast, .rx_tuser(1'b0),
+      .mac_clk(clk), .mac_rst(rst), .mac_tx_clk(clk), .mac_tx_rst(rst), .tx_pcs_frames(16'h0), .rx_tdata, .rx_tvalid, .rx_tlast, .rx_tuser(1'b0),
       .tx_tdata, .tx_tvalid, .tx_tlast, .tx_tready(1'b1), .pcs_status(16'h0c03)
   );
 
@@ -47,6 +49,9 @@ module tb;
   logic [7:0] rx_tdata = 0, tx_tdata;
   logic       rx_tvalid = 0, rx_tlast = 0, tx_tvalid, tx_tlast;
   logic [7:0] txq[$], back[$][];
+  longint     back_due[$];       // when each frame in back may go
+  longint     sink_delay = 0;
+  initial void'($value$plusargs("sinkdelay=%d", sink_delay));
   bit tcp_sink = 0;
   initial tcp_sink = $test$plusargs("tcpsink");
   logic [31:0] sink_nxt = 0;      // next sequence number expected
@@ -72,7 +77,7 @@ module tb;
     c = ~csum(q, 14, 20, 0);  r[24] = c[15:8]; r[25] = c[7:0];
     c = ~csum(q, 34, hl, {16'b0, r[26], r[27]} + {16'b0, r[28], r[29]} + {16'b0, r[30], r[31]} + {16'b0, r[32], r[33]} + 32'd6 + 32'(hl));
     r[50] = c[15:8]; r[51] = c[7:0];
-    back.push_back(r);
+    back.push_back(r); back_due.push_back(cycles + sink_delay);
   endfunction
 
   function automatic void sink_segment(input logic [7:0] f[$], input int l4, input int l4len);
@@ -121,7 +126,7 @@ module tb;
       for (int i = 0; i < 6; i++) begin r[i] = f[6 + i]; r[6 + i] = peer[8*i+:8]; r[22 + i] = peer[8*i+:8]; r[32 + i] = f[22 + i]; end
       r[21] = 8'h02;
       for (int i = 0; i < 4; i++) begin r[28 + i] = f[38 + i]; r[38 + i] = f[28 + i]; end
-      back.push_back(r);
+      back.push_back(r); back_due.push_back(cycles);
       eth_arp++;
     end else if (n >= 34 && f[12] == 8'h08 && f[13] == 8'h00 && f[14][7:4] == 4'h4) begin
       automatic int ihl = int'(f[14][3:0]) * 4, tot = {f[16], f[17]}, l4 = 14 + ihl, l4len = tot - ihl;
@@ -146,7 +151,7 @@ module tb;
           for (int i = 0; i < 6; i++) begin r[i] = f[6 + i]; r[6 + i] = f[i]; end
           for (int i = 0; i < 4; i++) begin r[26 + i] = f[30 + i]; r[30 + i] = f[26 + i]; end
           for (int i = 0; i < 2; i++) begin r[l4 + i] = f[l4 + 2 + i]; r[l4 + 2 + i] = f[l4 + i]; end
-          back.push_back(r);
+          back.push_back(r); back_due.push_back(cycles);
           eth_reflected++;
         end
       end
@@ -159,8 +164,9 @@ module tb;
   end
   initial forever begin
     @(posedge clk);
-    if (back.size() != 0) begin
+    if (back.size() != 0 && cycles >= back_due[0]) begin
       automatic logic [7:0] r[] = back.pop_front();
+      void'(back_due.pop_front());
       for (int i = 0; i < r.size(); i++) begin
         rx_tdata <= r[i]; rx_tvalid <= 1; rx_tlast <= i == r.size() - 1;
         @(posedge clk);

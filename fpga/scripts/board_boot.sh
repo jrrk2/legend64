@@ -9,7 +9,7 @@ set -u
 here=$(cd "$(dirname "$0")" && pwd)
 bit=${1:?bitstream}
 log=${bit%.bit}.uart.log
-(python3 "$here/serial.py" capture 60 --until "> " > "$log" 2>&1) &
+(python3 "$here/serial.py" capture ${2:-60} --until "> " > "$log" 2>&1) &
 cap=$!
 sleep 0.5
 $HOME/synthgui/build-deps/prefix/bin/openFPGALoader --cable digilent --freq 15000000 "$bit" 2>&1 | tr "\r" "\n" | grep -E "isc_done|^Done |DCI match|EOS |CRC Error|^Done$" | tail -6

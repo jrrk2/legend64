@@ -78,6 +78,11 @@
 #define FE_RX_FIFO	0x68		/* 16-bit counts of frames lost in the hardware: FIFO full, */
 #define FE_RX_BAD	0x6c		/* marked bad by the MAC, */
 #define FE_RX_LONG	0x70		/* longer than 1518 bytes */
+#define  FE_FEAT_TX_COUNTERS	BIT(4)
+#define FE_TX_QUEUED	0x74		/* 16-bit counts of transmit frames: put into the FIFO, */
+#define FE_TX_DISCARD	0x78		/* given up by the hardware, */
+#define FE_TX_MAC	0x7c		/* taken by the MAC, */
+#define FE_TX_PCS	0x80		/* started on the MAC's output */
 
 #define FE_DESC_DONE	BIT(0)
 #define FE_RXD_CSUM	BIT(1)		/* bits 31:16 hold the sum */
@@ -577,6 +582,33 @@ static int fe_set_mac_address(struct net_device *ndev, void *addr)
 	return err;
 }
 
+/*
+ * The hardware's 16-bit frame counters as they stand, for finding where frames go missing:
+ * read the file before and after a test and subtract (they wrap).
+ */
+static ssize_t hw_counters_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct fe_priv *p = netdev_priv(dev_get_drvdata(dev));
+	int n = 0;
+
+	if (p->hw_feat & FE_FEAT_TX_COUNTERS)
+		n += sysfs_emit_at(buf, n, "tx_queued %u\ntx_discarded %u\ntx_mac %u\ntx_pcs %u\n",
+				   fe_rd(p, FE_TX_QUEUED), fe_rd(p, FE_TX_DISCARD),
+				   fe_rd(p, FE_TX_MAC), fe_rd(p, FE_TX_PCS));
+	if (p->hw_feat & FE_FEAT_COUNTERS)
+		n += sysfs_emit_at(buf, n, "rx_fifo_full %u\nrx_bad %u\nrx_long %u\n",
+				   fe_rd(p, FE_RX_FIFO), fe_rd(p, FE_RX_BAD), fe_rd(p, FE_RX_LONG));
+	n += sysfs_emit_at(buf, n, "rx_no_descriptor %u\n", fe_rd(p, FE_RX_DROPPED));
+	return n;
+}
+static DEVICE_ATTR_RO(hw_counters);
+
+static struct attribute *fe_attrs[] = {
+	&dev_attr_hw_counters.attr,
+	NULL
+};
+ATTRIBUTE_GROUPS(fe);
+
 static const struct net_device_ops fe_netdev_ops = {
 	.ndo_open		= fe_open,
 	.ndo_stop		= fe_stop,
@@ -670,6 +702,7 @@ static struct platform_driver fe_driver = {
 	.probe = fe_probe,
 	.driver = {
 		.name = "legend-eth",
+		.dev_groups = fe_groups,
 		.of_match_table = fe_of_match,
 	},
 };
