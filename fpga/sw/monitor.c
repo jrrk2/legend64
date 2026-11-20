@@ -1,4 +1,4 @@
-// Boot monitor for fable64 on the VC707. Runs in machine mode from block RAM.
+// Boot monitor for legend64 on the VC707. Runs in machine mode from block RAM.
 //
 // It checks the DDR3 memory and the FPU, brings up the Ethernet MAC, answers ARP and ping, and
 // loads images into memory over UDP so that firmware, kernel and device tree arrive in seconds
@@ -263,7 +263,7 @@ static void boot(void (*entry)(uint64_t, uint64_t), uint64_t arg) {
 
 int main(void) {
   LEDS = 1;
-  puts_("\n\nfable64 on VC707 - RV64GC boot monitor\n");
+  puts_("\n\nlegend64 on VC707 - RV64GC boot monitor\n");
   int ddr_bad = 0;
   (void)ddr_bad;
 #ifndef QUICK

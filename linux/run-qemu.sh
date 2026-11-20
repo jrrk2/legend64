@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run the fable64 kernel on QEMU "virt", with the CPU cut down to what the
+# Run the legend64 kernel on QEMU "virt", with the CPU cut down to what the
 # real hardware has (as far as QEMU allows).
 #
 #   ./run-qemu.sh [initramfs] [qemu args...]   QEMU loads kernel+initramfs, QEMU's own DTB
@@ -33,7 +33,7 @@ board)
     exec "$QEMU" "${common[@]}" -bios none \
         -device loader,file="$OPENSBI",addr=0x80000000,force-raw=on \
         -device loader,file="$here/out/Image",addr=0x80200000,force-raw=on \
-        -device loader,file="$here/out/fable64-vc707-initramfs.dtb",addr=0x86000000,force-raw=on \
+        -device loader,file="$here/out/legend64-vc707-initramfs.dtb",addr=0x86000000,force-raw=on \
         -device loader,file="$here/out/initramfs.cpio.gz",addr=0x88000000,force-raw=on \
         -device loader,file="$here/out/bootmon-shim.bin",addr=0x8f000000,force-raw=on \
         -device loader,addr=0x8f000000,cpu-num=0 "$@" ;;

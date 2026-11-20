@@ -1,6 +1,6 @@
 // Minimal <string.h> for building the riscv-tests "v" environment without a C library.
-#ifndef FABLE_STRING_H
-#define FABLE_STRING_H
+#ifndef LEGEND_STRING_H
+#define LEGEND_STRING_H
 #include <stddef.h>
 void *memcpy(void *, const void *, size_t);
 void *memset(void *, int, size_t);

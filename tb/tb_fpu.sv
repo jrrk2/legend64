@@ -1,4 +1,4 @@
-// Unit testbench for fable64_fpu: replays reference vectors (scripts/fpu_vectors.c) and compares
+// Unit testbench for legend64_fpu: replays reference vectors (scripts/fpu_vectors.c) and compares
 // the result and exception flags of every operation.
 `timescale 1ns / 1ps
 module tb;
@@ -10,7 +10,7 @@ module tb;
   logic [2:0]  rm;
   logic [4:0]  flags;
   logic [7:0]  exp_fl;
-  fable64_fpu dut (.clk, .rst_n, .start, .accept(done), .insn, .a_raw(a), .b_raw(b), .c_raw(c), .x_in(x), .rm,
+  legend64_fpu dut (.clk, .rst_n, .start, .accept(done), .insn, .a_raw(a), .b_raw(b), .c_raw(c), .x_in(x), .rm,
                    .busy, .done, .result, .flags);
   int fd, n = 0, bad = 0, rmi;
   string vec;

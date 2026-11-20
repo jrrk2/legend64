@@ -18,7 +18,7 @@ module tb;
   logic [31:0]  dcsr_wdata, dcsr_rdata;
   longint cycles = 0, max_cycles = 300_000_000, csr_rd = 0, csr_wr = 0;
 
-  fable64_soc #(.CLK_HZ(50_000_000), .BAUD(3_000_000), .BUILD_ID(32'h51a0_0003),
+  legend64_soc #(.CLK_HZ(50_000_000), .BAUD(3_000_000), .BUILD_ID(32'h51a0_0003),
                 .BOOT_HEX("build/fpga/boot.hex")) dut (
       .clk, .rst, .ddr_ready(1'b1), .ddr_soft(1'b1),
       .dcsr_req, .dcsr_we, .dcsr_addr, .dcsr_wdata, .dcsr_ack, .dcsr_rdata,

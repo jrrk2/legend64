@@ -1,4 +1,4 @@
-// Testbench shared by PicoRV32 (reference, -DREF) and pico_fable on the native memory interface.
+// Testbench shared by PicoRV32 (reference, -DREF) and pico_legend on the native memory interface.
 //
 // Memory model: by default the look-ahead model from PicoRV32's own dhrystone/testbench.v
 // (synchronous RAM addressed by mem_la_addr, mem_ready tied high). +nola selects the model
@@ -27,7 +27,7 @@ module tb;
       .PROGADDR_RESET(32'h80)
   ) uut (
 `else
-  pico_fable #(
+  pico_legend #(
       .PROGADDR_RESET(32'h80)
   ) uut (
 `endif

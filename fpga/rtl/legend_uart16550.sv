@@ -1,8 +1,8 @@
-// fable_uart16550: the subset of a 16550A that Linux's 8250 driver and OpenSBI use.
+// legend_uart16550: the subset of a 16550A that Linux's 8250 driver and OpenSBI use.
 // Byte-wide registers at offsets 0..7. The line always runs 8N1 at BAUD, derived from the
 // system clock by a fractional divider: the divisor latch is stored and read back but has no
 // effect. 16-byte receive FIFO; receive-data and transmitter-empty interrupts.
-module fable_uart16550 #(
+module legend_uart16550 #(
     parameter int unsigned CLK_HZ = 25_000_000,
     parameter int unsigned BAUD   = 115_200
 ) (

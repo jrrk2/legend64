@@ -1,4 +1,4 @@
-# RV64G images for fable64: the upstream riscv-tests ISA suite (standard "p" environment)
+# RV64G images for legend64: the upstream riscv-tests ISA suite (standard "p" environment)
 # and the benchmarks. Outputs go to build/sw/rv64/.
 ROOT := $(abspath ../..)
 P    := $(ROOT)/tools/root/usr/bin/riscv64-unknown-elf-

@@ -1,4 +1,4 @@
-// Unit test of fable_eth against a byte-array memory and scripted MAC streams.
+// Unit test of legend_eth against a byte-array memory and scripted MAC streams.
 // Transmit: random frames of one to four descriptors at random byte alignments, with and without
 // checksum insertion, some too long (to be discarded); the bytes that come out are compared
 // with the expected frame, checksum computed here the textbook (big-endian) way.
@@ -28,7 +28,7 @@ module tb;
   logic [7:0]  e_be, rx_tdata = 0, tx_tdata;
   logic        rx_tvalid = 0, rx_tlast = 0, tx_tvalid, tx_tlast, tx_tready = 1;
 
-  fable_eth #(.RX_FIFO_AW(RX_FIFO_AW)) dut (
+  legend_eth #(.RX_FIFO_AW(RX_FIFO_AW)) dut (
       .clk, .rst, .reg_sel, .reg_we, .reg_addr, .reg_wdata, .reg_rdata, .irq,
       .e_req, .e_we, .e_addr, .e_wdata, .e_be, .e_gnt, .e_rvalid, .e_rdata,
       .mac_clk, .mac_rst(rst), .mac_tx_clk, .mac_tx_rst(rst), .rx_tdata, .rx_tvalid, .rx_tlast, .rx_tuser(1'b0),

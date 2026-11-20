@@ -1,4 +1,4 @@
-// fable64: an RV64GC core (RV64IMAFDC + Zicsr + Zifencei) with machine, supervisor and user
+// legend64: an RV64GC core (RV64IMAFDC + Zicsr + Zifencei) with machine, supervisor and user
 // modes and Sv39 virtual memory.
 //
 // Pipeline:
@@ -26,7 +26,7 @@
 // Not implemented: PMP, debug mode, performance counters beyond cycle/instret/time. Misaligned loads and stores raise the
 // address-misaligned exceptions. wfi is a no-op.
 
-module fable64_tlb #(
+module legend64_tlb #(
     parameter int N = 8
 ) (
     input  logic        clk,
@@ -76,7 +76,7 @@ module fable64_tlb #(
   end
 endmodule
 
-module fable64 #(
+module legend64 #(
     parameter logic [63:0] RESET_PC = 64'h0000_0000_8000_0000,
     parameter int unsigned BHT_BITS = 9,
     parameter int          TLB_ENTRIES = 8      // each of the two TLBs; a power of two
@@ -382,7 +382,7 @@ module fable64 #(
                                             : (dtlb_perm[0] || (mstatus_mxr && dtlb_perm[2])));
   assign d_paddr    = d_xlate ? {8'b0, dtlb_ppn, ea[11:0]} : ea;
 
-  fable64_tlb #(.N(TLB_ENTRIES)) u_dtlb (
+  legend64_tlb #(.N(TLB_ENTRIES)) u_dtlb (
       .clk, .flush(tlb_flush), .vpn(ea[38:12]), .hit(dtlb_hit), .ppn(dtlb_ppn), .perm(dtlb_perm),
       .fill(ptw_fill_d), .fill_vpn(ptw_vpn), .fill_ppn(ptw_fill_ppn), .fill_level(ptw_level), .fill_perm(ptw_fill_perm)
   );
@@ -513,7 +513,7 @@ module fable64 #(
   logic        fpu_start, fpu_busy, fpu_done, x_done;
   logic [63:0] fpu_result;
   logic [4:0]  fpu_flags;
-  fable64_fpu u_fpu (
+  legend64_fpu u_fpu (
       .clk, .rst_n,
       .start(fpu_start), .accept(x_done), .insn(ir),
       .a_raw(fa), .b_raw(fb), .c_raw(fc), .x_in(rs1v), .rm(rm_eff),
@@ -737,7 +737,7 @@ module fable64 #(
     end
   end
 
-  fable64_rvc u_rvc (.c(win_data[15:0]), .x(e_rvc_x), .illegal(e_rvc_ill));
+  legend64_rvc u_rvc (.c(win_data[15:0]), .x(e_rvc_x), .illegal(e_rvc_ill));
 
   assign e_c    = win_data[1:0] != 2'b11;
   assign e_flt  = win_flt[0] ? 2'd1 : (!e_c && win_flt[1]) ? 2'd2 : 2'd0;
@@ -787,7 +787,7 @@ module fable64 #(
   assign i_need_walk = i_xlate && !i_noncanon && !itlb_hit && !(iptw_fault && iptw_fault_vpn == fetch_vpn);
   assign fetch_pa    = i_xlate ? {8'b0, itlb_ppn, fetch_va[11:2], 2'b00} : {fetch_va[63:2], 2'b00};
 
-  fable64_tlb #(.N(TLB_ENTRIES)) u_itlb (
+  legend64_tlb #(.N(TLB_ENTRIES)) u_itlb (
       .clk, .flush(tlb_flush), .vpn(fetch_vpn), .hit(itlb_hit), .ppn(itlb_ppn), .perm(itlb_perm),
       .fill(ptw_fill_i), .fill_vpn(ptw_vpn), .fill_ppn(ptw_fill_ppn), .fill_level(ptw_level), .fill_perm(ptw_fill_perm)
   );

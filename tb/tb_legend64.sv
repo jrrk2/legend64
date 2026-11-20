@@ -1,4 +1,4 @@
-// Testbench for fable64: 16 MB of RAM at 0x8000_0000, console at 0x1000_0000, HTIF-style
+// Testbench for legend64: 16 MB of RAM at 0x8000_0000, console at 0x1000_0000, HTIF-style
 // tohost at 0x8000_1000 (as laid out by the riscv-tests linker script), and a CLINT-style
 // timer (msip 0x0200_0000, mtimecmp 0x0200_4000, mtime 0x0200_bff8).
 //
@@ -22,7 +22,7 @@ module tb;
   logic        msip = 0;
   logic [63:0] mtime = 0, mtimecmp = '1;
 
-  fable64 uut (
+  legend64 uut (
       .clk, .rst_n,
       .imem_req, .imem_addr, .imem_gnt, .imem_rvalid, .imem_rdata,
       .dmem_req, .dmem_we, .dmem_addr, .dmem_wdata, .dmem_be, .dmem_gnt, .dmem_rvalid, .dmem_rdata,

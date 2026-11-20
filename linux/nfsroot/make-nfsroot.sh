@@ -10,7 +10,7 @@
 # Afterwards:
 #   2. sudo ./second-stage-qemu.sh         (finishes the install under QEMU, ~10 min)
 #   3. sudo ./setup-nfs-server.sh          (exports the tree to the board)
-#   4. boot the board with out/fable64-vc707.dtb
+#   4. boot the board with out/legend64-vc707.dtb
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 TARGET=${TARGET:-/srv/nfs/fable64}
@@ -39,7 +39,7 @@ fi
 mkdir -p "$TARGET"
 "${DEBOOTSTRAP[@]}" --foreign --arch=riscv64 --keyring="$KEYRING" \
     --include="$INCLUDE" "$SUITE" "$TARGET" "$MIRROR"
-install -m 755 "$here/target/fable64-second-stage.sh" "$TARGET/fable64-second-stage.sh"
+install -m 755 "$here/target/legend64-second-stage.sh" "$TARGET/legend64-second-stage.sh"
 
 echo
 echo "Stage 1 done in $TARGET.  Next:  sudo $here/second-stage-qemu.sh"

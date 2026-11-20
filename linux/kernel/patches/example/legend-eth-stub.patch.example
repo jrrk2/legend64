@@ -5,7 +5,7 @@ diff -urN a/drivers/net/ethernet/Kconfig b/drivers/net/ethernet/Kconfig
  source "drivers/net/ethernet/emulex/Kconfig"
  source "drivers/net/ethernet/engleder/Kconfig"
  source "drivers/net/ethernet/ezchip/Kconfig"
-+source "drivers/net/ethernet/fable/Kconfig"
++source "drivers/net/ethernet/legend/Kconfig"
  source "drivers/net/ethernet/faraday/Kconfig"
  source "drivers/net/ethernet/freescale/Kconfig"
  source "drivers/net/ethernet/fujitsu/Kconfig"
@@ -16,47 +16,47 @@ diff -urN a/drivers/net/ethernet/Makefile b/drivers/net/ethernet/Makefile
  obj-$(CONFIG_NET_VENDOR_EMULEX) += emulex/
  obj-$(CONFIG_NET_VENDOR_ENGLEDER) += engleder/
  obj-$(CONFIG_NET_VENDOR_EZCHIP) += ezchip/
-+obj-$(CONFIG_FABLE_ETH) += fable/
++obj-$(CONFIG_LEGEND_ETH) += legend/
  obj-$(CONFIG_NET_VENDOR_FARADAY) += faraday/
  obj-$(CONFIG_NET_VENDOR_FREESCALE) += freescale/
  obj-$(CONFIG_NET_VENDOR_FUJITSU) += fujitsu/
-diff -urN a/drivers/net/ethernet/fable/Kconfig b/drivers/net/ethernet/fable/Kconfig
---- a/drivers/net/ethernet/fable/Kconfig	1970-01-01 00:00:00.000000000 +0000
-+++ b/drivers/net/ethernet/fable/Kconfig	2026-11-19 16:44:37.545275534 +0000
+diff -urN a/drivers/net/ethernet/legend/Kconfig b/drivers/net/ethernet/legend/Kconfig
+--- a/drivers/net/ethernet/legend/Kconfig	1970-01-01 00:00:00.000000000 +0000
++++ b/drivers/net/ethernet/legend/Kconfig	2026-11-19 16:44:37.545275534 +0000
 @@ -0,0 +1,7 @@
 +# SPDX-License-Identifier: GPL-2.0-only
-+config FABLE_ETH
-+	tristate "fable64 native descriptor-ring Ethernet MAC (fable,eth)"
++config LEGEND_ETH
++	tristate "legend64 native descriptor-ring Ethernet MAC (legend,eth)"
 +	depends on OF && HAS_IOMEM && HAS_DMA
 +	help
-+	  Ethernet MAC of the fable64 VC707 SoC.  It DMAs packets directly
++	  Ethernet MAC of the legend64 VC707 SoC.  It DMAs packets directly
 +	  to and from system RAM (cache coherent, no IOMMU).
-diff -urN a/drivers/net/ethernet/fable/Makefile b/drivers/net/ethernet/fable/Makefile
---- a/drivers/net/ethernet/fable/Makefile	1970-01-01 00:00:00.000000000 +0000
-+++ b/drivers/net/ethernet/fable/Makefile	2026-11-19 16:44:37.550275451 +0000
+diff -urN a/drivers/net/ethernet/legend/Makefile b/drivers/net/ethernet/legend/Makefile
+--- a/drivers/net/ethernet/legend/Makefile	1970-01-01 00:00:00.000000000 +0000
++++ b/drivers/net/ethernet/legend/Makefile	2026-11-19 16:44:37.550275451 +0000
 @@ -0,0 +1,2 @@
 +# SPDX-License-Identifier: GPL-2.0-only
-+obj-$(CONFIG_FABLE_ETH) += fable_eth.o
-diff -urN a/drivers/net/ethernet/fable/fable_eth.c b/drivers/net/ethernet/fable/fable_eth.c
---- a/drivers/net/ethernet/fable/fable_eth.c	1970-01-01 00:00:00.000000000 +0000
-+++ b/drivers/net/ethernet/fable/fable_eth.c	2026-11-19 16:44:37.540573493 +0000
++obj-$(CONFIG_LEGEND_ETH) += legend_eth.o
+diff -urN a/drivers/net/ethernet/legend/legend_eth.c b/drivers/net/ethernet/legend/legend_eth.c
+--- a/drivers/net/ethernet/legend/legend_eth.c	1970-01-01 00:00:00.000000000 +0000
++++ b/drivers/net/ethernet/legend/legend_eth.c	2026-11-19 16:44:37.540573493 +0000
 @@ -0,0 +1,19 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/* STUB used only to test the build plumbing - not a driver. */
 +#include <linux/module.h>
 +#include <linux/of.h>
 +#include <linux/platform_device.h>
-+static int fable_eth_probe(struct platform_device *pdev)
++static int legend_eth_probe(struct platform_device *pdev)
 +{
-+	dev_info(&pdev->dev, "fable,eth stub: no driver yet\n");
++	dev_info(&pdev->dev, "legend,eth stub: no driver yet\n");
 +	return -ENODEV;
 +}
-+static const struct of_device_id fable_eth_of_match[] = {
-+	{ .compatible = "fable,eth" }, { }
++static const struct of_device_id legend_eth_of_match[] = {
++	{ .compatible = "legend,eth" }, { }
 +};
-+static struct platform_driver fable_eth_driver = {
-+	.probe = fable_eth_probe,
-+	.driver = { .name = "fable-eth", .of_match_table = fable_eth_of_match },
++static struct platform_driver legend_eth_driver = {
++	.probe = legend_eth_probe,
++	.driver = { .name = "legend-eth", .of_match_table = legend_eth_of_match },
 +};
-+module_platform_driver(fable_eth_driver);
++module_platform_driver(legend_eth_driver);
 +MODULE_LICENSE("GPL");

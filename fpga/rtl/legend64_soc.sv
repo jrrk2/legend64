@@ -1,4 +1,4 @@
-// fable64_soc: the fable64 core with its boot memory, DDR cache and peripherals. Everything
+// legend64_soc: the legend64 core with its boot memory, DDR cache and peripherals. Everything
 // here runs on the system clock except the far side of the Ethernet packet FIFOs.
 //
 // The layout follows QEMU's `virt` machine where the two overlap, so the same firmware and
@@ -8,11 +8,11 @@
 //   0x0c00_0000  PLIC (source 10: UART, source 2: Ethernet)
 //   0x1000_0000  16550-compatible UART, byte registers
 //   0x2000_0000  board: LEDs +0, switches/buttons +4, status +8, clock Hz +0xc, build id +0x10
-//   0x3000_0000  Ethernet MAC registers (see fable_eth.sv)
+//   0x3000_0000  Ethernet MAC registers (see legend_eth.sv)
 //   0x4000_0000  memory controller registers, 64 KiB (LiteDRAM builds: the monitor runs the
 //                DDR3 initialisation and levelling through these before it uses the memory)
 //   0x8000_0000  1 GiB DDR3 through the cache
-module fable64_soc #(
+module legend64_soc #(
     parameter int unsigned CLK_HZ   = 50_000_000,
     parameter int unsigned BAUD     = 115_200,
     parameter logic [31:0] BUILD_ID = 32'h0,
@@ -71,7 +71,7 @@ module fable64_soc #(
 
   always_ff @(posedge clk) core_rst_n <= !rst && ddr_ready;
 
-  fable64 #(.RESET_PC(64'h0000_0000_0001_0000), .TLB_ENTRIES(TLB_ENTRIES)) u_core (
+  legend64 #(.RESET_PC(64'h0000_0000_0001_0000), .TLB_ENTRIES(TLB_ENTRIES)) u_core (
       .clk, .rst_n(core_rst_n),
       .imem_req, .imem_addr, .imem_gnt, .imem_rvalid, .imem_rdata,
       .dmem_req, .dmem_we, .dmem_addr, .dmem_wdata, .dmem_be, .dmem_gnt, .dmem_rvalid, .dmem_rdata,
@@ -91,7 +91,7 @@ module fable64_soc #(
   // ------------------------------------------------------------------ boot memory
   logic [63:0] boot_iq, boot_dq;
   logic        boot_i_rv, boot_i_hi, boot_d_rv, none_i_rv;
-  fable_tdp_be #(.AW(13), .NB(8), .INIT_FILE(BOOT_HEX)) u_boot (
+  legend_tdp_be #(.AW(13), .NB(8), .INIT_FILE(BOOT_HEX)) u_boot (
       .clk,
       .a_addr(imem_addr[15:3]), .a_q(boot_iq),
       .b_addr(dmem_addr[15:3]), .b_we((dmem_req && dmem_we && d_boot) ? dmem_be : 8'h00),
@@ -106,7 +106,7 @@ module fable64_soc #(
   logic [29:0] e_addr;
   logic [63:0] e_wdata, e_rdata;
   logic [7:0]  e_be;
-  fable_cache #(.LINES_LOG2(CACHE_LINES_LOG2)) u_cache (
+  legend_cache #(.LINES_LOG2(CACHE_LINES_LOG2)) u_cache (
       .clk, .rst(!core_rst_n),
       .i_req(imem_req && i_ddr), .i_addr(imem_addr[29:0]), .i_gnt(c_i_gnt), .i_rvalid(c_i_rvalid), .i_rdata(c_i_rdata),
       .d_req(dmem_req && d_ddr), .d_we(dmem_we), .d_addr(dmem_addr[29:0]), .d_wdata(dmem_wdata), .d_be(dmem_be),
@@ -147,7 +147,7 @@ module fable64_soc #(
     else if (dmem_req && d_mmio && sel_dcsr && !dcsr_ack_s[1]) dcsr_req <= 1'b1;
   end
 
-  fable_uart16550 #(.CLK_HZ(CLK_HZ), .BAUD(BAUD)) u_uart (
+  legend_uart16550 #(.CLK_HZ(CLK_HZ), .BAUD(BAUD)) u_uart (
       .clk, .rst(!core_rst_n),
       .sel(mmio_acc && sel_uart), .we(dmem_we), .addr(dmem_addr[2:0]),
       .wdata(dmem_wdata[{dmem_addr[2:0], 3'b000}+:8]), .rdata(uart_q), .irq(uart_irq),
@@ -160,13 +160,13 @@ module fable64_soc #(
     plic_src[10] = uart_irq;
     plic_src[2]  = eth_irq;
   end
-  fable_plic u_plic (
+  legend_plic u_plic (
       .clk, .rst(!core_rst_n),
       .sel(mmio_acc && sel_plic), .we(dmem_we), .addr(dmem_addr[25:0]), .wdata(wr32), .rdata(plic_q),
       .src(plic_src), .irq_m(irq_m_ext), .irq_s(irq_s_ext)
   );
 
-  fable_eth u_eth (
+  legend_eth u_eth (
       .clk, .rst(!core_rst_n),
       .reg_sel(mmio_acc && sel_eth), .reg_we(dmem_we), .reg_addr(dmem_addr[7:0]), .reg_wdata(wr32),
       .reg_rdata(eth_q), .irq(eth_irq),

@@ -19,7 +19,7 @@ dpkg -x "$dl/$DEB" "$work/busybox-static"          # untrusted archive: own dire
 install -m 755 "$work/busybox-static/usr/bin/busybox" "$root/bin/busybox"
 ln -s busybox "$root/bin/sh"
 install -m 755 "$here/initramfs/init" "$root/init"
-echo "fable64" > "$root/etc/hostname"
+echo "legend64" > "$root/etc/hostname"
 printf 'root::0:0:root:/root:/bin/sh\n' > "$root/etc/passwd"
 printf 'root:x:0:\n' > "$root/etc/group"
 

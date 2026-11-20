@@ -1,4 +1,4 @@
-// Minimal <stdio.h> for building LiteX's liblitedram into the fable64 boot monitor.
+// Minimal <stdio.h> for building LiteX's liblitedram into the legend64 boot monitor.
 #pragma once
 #include <stddef.h>
 #include <stdarg.h>

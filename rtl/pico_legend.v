@@ -1,4 +1,4 @@
-// pico_fable: an RV32IM core that plugs into the PicoRV32 native memory interface.
+// pico_legend: an RV32IM core that plugs into the PicoRV32 native memory interface.
 //
 // Designed from the PicoRV32 interface description, not derived from its RTL. Where PicoRV32
 // is a multi-cycle state machine, this is a three-stage pipeline built around the fact that
@@ -16,7 +16,7 @@
 // Not implemented: PicoRV32's custom IRQ instructions, PCPI, compressed ISA, trace port.
 // The parameters and ports for those exist so the module is a drop-in, but they are inert.
 
-module pico_fable #(
+module pico_legend #(
 	parameter [ 0:0] ENABLE_COUNTERS = 1,
 	parameter [ 0:0] ENABLE_COUNTERS64 = 1,
 	parameter [ 0:0] ENABLE_REGS_16_31 = 1,

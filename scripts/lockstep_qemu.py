@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Compare a fable64 run with QEMU, instruction by instruction.
+"""Compare a legend64 run with QEMU, instruction by instruction.
 
 usage: lockstep_qemu.py <test.elf> [--keep]
 
 Runs the ELF on QEMU's `spike` machine (one instruction per translation block, logging the PC
-and integer registers before every instruction) and on the fable64 simulator (logging every
+and integer registers before every instruction) and on the legend64 simulator (logging every
 retired instruction, its register write, and every trap). Then walks the two streams together:
 the PCs must match step for step, and after each instruction the registers must agree.
 
-QEMU logs an instruction that traps as an executed step with no register change; fable64 logs
+QEMU logs an instruction that traps as an executed step with no register change; legend64 logs
 it as a trap. QEMU logs nothing at all for an instruction-fetch page fault or an interrupt. Values that legitimately differ between the two machines are not compared:
 reads of the cycle, time and instruction counters.
 """
@@ -32,7 +32,7 @@ r = subprocess.run([os.path.join(root, "tools/qemu-rv64"), "-M", "spike", "-cpu"
 if r.returncode not in (0, 1) or not os.path.getsize(qlog):
     sys.exit("qemu failed: " + r.stdout.decode()[:300])
 tohost = open(base + ".tohost").read().strip()
-subprocess.run([os.path.join(root, "build/sim/fable64"), "+hex=" + base + ".hex", "+tohost=" + tohost, "+quiet",
+subprocess.run([os.path.join(root, "build/sim/legend64"), "+hex=" + base + ".hex", "+tohost=" + tohost, "+quiet",
                 "+max_cycles=5000000", "+trace=" + dlog], stdout=subprocess.DEVNULL, timeout=300)
 
 # QEMU: a Trace line for each instruction, followed by the register dump from before it runs
@@ -65,7 +65,7 @@ for line in open(dlog):
 def is_counter_read(insn):
     return insn & 0x7f == 0x73 and (insn >> 12) & 3 != 0 and (insn >> 20) in (0xb00, 0xb02, 0xc00, 0xc01, 0xc02)
 
-# CSRs QEMU implements and fable64 does not; software probes them and catches the trap
+# CSRs QEMU implements and legend64 does not; software probes them and catches the trap
 QEMU_ONLY_CSRS = {0x744, 0x741, 0x742, 0x740, 0x3a0, 0x3b0, 0x747, 0x30c, 0x10c, 0x14d, 0x5a8}
 
 def probes_qemu_only_csr(insn):
@@ -95,7 +95,7 @@ for qi in range(len(qsteps) - 1):
     if di >= len(dut):
         break
     if ev[1] != pc:
-        print(f"MISMATCH {os.path.basename(base)} step {qi}: qemu pc {pc:x}, fable64 {ev[0]} at {ev[1]:x}")
+        print(f"MISMATCH {os.path.basename(base)} step {qi}: qemu pc {pc:x}, legend64 {ev[0]} at {ev[1]:x}")
         sys.exit(1)
     di += 1
     if ev[0] == "trap":
@@ -103,8 +103,8 @@ for qi in range(len(qsteps) - 1):
         if ev[2] == 2 and probes_qemu_only_csr(ev[3]):
             pass
         elif qsteps[qi + 1][0] == pc + 2 or qsteps[qi + 1][0] == pc + 4:
-            # QEMU went straight on where fable64 trapped
-            print(f"MISMATCH {os.path.basename(base)} step {qi}: fable64 trapped at {pc:x} (cause {ev[2]:x}), qemu did not")
+            # QEMU went straight on where legend64 trapped
+            print(f"MISMATCH {os.path.basename(base)} step {qi}: legend64 trapped at {pc:x} (cause {ev[2]:x}), qemu did not")
             sys.exit(1)
     else:
         if ev[3]:
@@ -113,7 +113,7 @@ for qi in range(len(qsteps) - 1):
             shadow[ev[3][0]] = nregs[ev[3][0]]
     for i in range(1, 32):
         if shadow[i] != nregs[i]:
-            print(f"MISMATCH {os.path.basename(base)} step {qi} pc {pc:x} insn {ev[2] if ev[0]=='ret' else 0:08x}: x{i} qemu {nregs[i]:x} fable64 {shadow[i]:x}")
+            print(f"MISMATCH {os.path.basename(base)} step {qi} pc {pc:x} insn {ev[2] if ev[0]=='ret' else 0:08x}: x{i} qemu {nregs[i]:x} legend64 {shadow[i]:x}")
             sys.exit(1)
     checked += 1
 print(f"OK {os.path.basename(base)} steps={checked} traps={traps} qemu_repeats={skipped}")

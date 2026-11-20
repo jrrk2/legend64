@@ -1,18 +1,18 @@
 #!/bin/bash
-# Build the fable64 kernel: mainline linux-6.18.64, unmodified source,
-# config kernel/fable64_defconfig.  No root needed.
+# Build the legend64 kernel: mainline linux-6.18.64, unmodified source,
+# config kernel/legend64_defconfig.  No root needed.
 #
 #   ./build-kernel.sh                  build  -> out/Image
-#   ./build-kernel.sh regen-defconfig  regenerate kernel/fable64_defconfig from
-#                                      kernel/fable64.fragment (allnoconfig + fragment)
+#   ./build-kernel.sh regen-defconfig  regenerate kernel/legend64_defconfig from
+#                                      kernel/legend64.fragment (allnoconfig + fragment)
 #   ./build-kernel.sh menuconfig       edit the config, then save it back as defconfig
 #
-# Optional out-of-tree Ethernet driver ("fable,eth"):
-#   if kernel/patches/fable-eth.patch exists it is applied (-p1) to the source
-#   tree before building and CONFIG_FABLE_ETH=y is added to the config; extra
-#   config lines the driver needs can go in kernel/patches/fable-eth.config.
+# Optional out-of-tree Ethernet driver ("legend,eth"):
+#   if kernel/patches/legend-eth.patch exists it is applied (-p1) to the source
+#   tree before building and CONFIG_LEGEND_ETH=y is added to the config; extra
+#   config lines the driver needs can go in kernel/patches/legend-eth.config.
 #   If the patch is later changed or removed, the old one is reverted first.
-#   kernel/make-fable-eth-patch.sh creates such a patch from a single fable_eth.c.
+#   kernel/make-legend-eth-patch.sh creates such a patch from a single legend_eth.c.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 KVER=6.18.64
@@ -23,9 +23,9 @@ JOBS=${JOBS:-12}                      # shared machine: never more than 12
 tarball=$here/dl/linux-$KVER.tar.xz
 src=$here/kernel/src/linux-$KVER
 build=$here/kernel/build
-patch_in=$here/kernel/patches/fable-eth.patch
-patch_cfg=$here/kernel/patches/fable-eth.config
-patch_applied=$here/kernel/src/.fable-eth.applied.patch
+patch_in=$here/kernel/patches/legend-eth.patch
+patch_cfg=$here/kernel/patches/legend-eth.config
+patch_applied=$here/kernel/src/.legend-eth.applied.patch
 
 # cross toolchain unpacked (dpkg -x) from Ubuntu gcc-riscv64-linux-gnu under tools/root
 export PATH=$here/tools/root/usr/bin:$PATH
@@ -39,9 +39,9 @@ if [ ! -d "$src" ]; then
     rm -f "$patch_applied"
 fi
 
-# ---- optional fable,eth driver patch ----------------------------------------
+# ---- optional legend,eth driver patch ----------------------------------------
 if [ -f "$patch_applied" ] && { [ ! -f "$patch_in" ] || ! cmp -s "$patch_in" "$patch_applied"; }; then
-    echo "== reverting previously applied fable-eth patch"
+    echo "== reverting previously applied legend-eth patch"
     patch -d "$src" -p1 -R -E --no-backup-if-mismatch < "$patch_applied"
     rm -f "$patch_applied"
 fi
@@ -57,29 +57,29 @@ mkdir -p "$build" "$here/out"
 
 case "${1:-build}" in
 regen-defconfig)
-    mk KCONFIG_ALLCONFIG="$here/kernel/fable64.fragment" allnoconfig
+    mk KCONFIG_ALLCONFIG="$here/kernel/legend64.fragment" allnoconfig
     mk savedefconfig
-    cp "$build/defconfig" "$here/kernel/fable64_defconfig"
-    echo "wrote kernel/fable64_defconfig"
+    cp "$build/defconfig" "$here/kernel/legend64_defconfig"
+    echo "wrote kernel/legend64_defconfig"
     exit 0 ;;
 menuconfig)
-    cp "$here/kernel/fable64_defconfig" "$build/.config"
+    cp "$here/kernel/legend64_defconfig" "$build/.config"
     mk olddefconfig; mk menuconfig; mk savedefconfig
-    cp "$build/defconfig" "$here/kernel/fable64_defconfig"
-    echo "wrote kernel/fable64_defconfig (kernel/fable64.fragment is NOT updated)"
+    cp "$build/defconfig" "$here/kernel/legend64_defconfig"
+    echo "wrote kernel/legend64_defconfig (kernel/legend64.fragment is NOT updated)"
     exit 0 ;;
 build) ;;
 *)  echo "usage: $0 [build|regen-defconfig|menuconfig]" >&2; exit 2 ;;
 esac
 
-cp "$here/kernel/fable64_defconfig" "$build/.config"
+cp "$here/kernel/legend64_defconfig" "$build/.config"
 if [ -f "$patch_applied" ]; then
-    echo "CONFIG_FABLE_ETH=y" >> "$build/.config"
+    echo "CONFIG_LEGEND_ETH=y" >> "$build/.config"
     [ -f "$patch_cfg" ] && cat "$patch_cfg" >> "$build/.config"
 fi
 mk olddefconfig
-if [ -f "$patch_applied" ] && ! grep -q '^CONFIG_FABLE_ETH=y' "$build/.config"; then
-    echo "ERROR: patch applied but CONFIG_FABLE_ETH=y did not survive olddefconfig" >&2
+if [ -f "$patch_applied" ] && ! grep -q '^CONFIG_LEGEND_ETH=y' "$build/.config"; then
+    echo "ERROR: patch applied but CONFIG_LEGEND_ETH=y did not survive olddefconfig" >&2
     echo "       (Kconfig symbol missing or its dependencies are not met)" >&2
     exit 1
 fi

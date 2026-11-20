@@ -17,7 +17,7 @@ wait $cap
 echo; echo "--- network load"
 ping -c 2 -W 1 192.168.1.51 > /dev/null
 (sleep 1; python3 "$here/netload.py" $root/tools/qemu/usr/lib/riscv64-linux-gnu/opensbi/generic/fw_jump.bin@80000000 \
-    $L/Image@80200000 $L/fable64-vc707-initramfs.dtb@86000000 $L/initramfs.cpio.gz@88000000 \
+    $L/Image@80200000 $L/legend64-vc707-initramfs.dtb@86000000 $L/initramfs.cpio.gz@88000000 \
     --jump 80000000 --arg 86000000 1>&2) &
 python3 "$here/serial.py" chat 90 "~ # " "cat /proc/cpuinfo; uname -a^" "~ # " "ifconfig eth0 192.168.1.51 up; sleep 3; ping -c 3 192.168.1.176^" "~ # " "cat /proc/interrupts; ifconfig eth0^" "~ # " ""
 wait

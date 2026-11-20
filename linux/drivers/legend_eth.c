@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Ethernet driver for the fable64 SoC's descriptor-ring MAC (RTL: fpga/rtl/fable_eth.sv).
+ * Ethernet driver for the legend64 SoC's descriptor-ring MAC (RTL: fpga/rtl/legend_eth.sv).
  *
  * The MAC moves frames by DMA through a coherent port on the CPU's own cache, so buffers
  * need no cache maintenance and received data is already cached when the stack reads it.
@@ -652,7 +652,7 @@ static int fe_probe(struct platform_device *pdev)
 	err = devm_register_netdev(dev, ndev);
 	if (err)
 		return err;
-	netdev_info(ndev, "fable64 Ethernet at %pR, irq %d, %pM, offloads:%s%s%s\n",
+	netdev_info(ndev, "legend64 Ethernet at %pR, irq %d, %pM, offloads:%s%s%s\n",
 		    platform_get_resource(pdev, IORESOURCE_MEM, 0), irq, ndev->dev_addr,
 		    p->hw_feat & FE_FEAT_RX_CSUM ? " rx-checksum" : "",
 		    ndev->hw_features & NETIF_F_TSO ? " tx-checksum sg tso" : "",
@@ -661,7 +661,7 @@ static int fe_probe(struct platform_device *pdev)
 }
 
 static const struct of_device_id fe_of_match[] = {
-	{ .compatible = "fable,eth" },
+	{ .compatible = "legend,eth" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, fe_of_match);
@@ -669,11 +669,11 @@ MODULE_DEVICE_TABLE(of, fe_of_match);
 static struct platform_driver fe_driver = {
 	.probe = fe_probe,
 	.driver = {
-		.name = "fable-eth",
+		.name = "legend-eth",
 		.of_match_table = fe_of_match,
 	},
 };
 module_platform_driver(fe_driver);
 
-MODULE_DESCRIPTION("fable64 SoC Ethernet (descriptor rings, cache-coherent DMA)");
+MODULE_DESCRIPTION("legend64 SoC Ethernet (descriptor rings, cache-coherent DMA)");
 MODULE_LICENSE("GPL");

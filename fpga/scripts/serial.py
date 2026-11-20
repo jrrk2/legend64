@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Talk to the fable64 boot monitor on the VC707 UART (/dev/ttyUSB0, 115200 8N1).
+"""Talk to the legend64 boot monitor on the VC707 UART (/dev/ttyUSB0, 115200 8N1).
 
 usage: serial.py capture <seconds> [keys]         print what arrives; optional keys are sent after 1 s
        serial.py run <image.bin> <seconds>        load the image to 0x8000_0000, start it, print its output

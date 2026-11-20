@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run one image on PicoRV32 and pico_fable and compare every register write and memory write, in order.
+# Run one image on PicoRV32 and pico_legend and compare every register write and memory write, in order.
 # usage: lockstep_pico.sh <hex> [plusargs for the new core only, e.g. +nola]   -> prints "OK <n events>" or the first difference
 cd "$(dirname "$0")/.."
 h=$1; shift

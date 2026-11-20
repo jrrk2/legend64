@@ -1,11 +1,11 @@
-// fable_plic: platform-level interrupt controller with the standard (SiFive) register layout,
+// legend_plic: platform-level interrupt controller with the standard (SiFive) register layout,
 // for one hart with a machine context (0) and a supervisor context (1).
 //   0x000000 + 4*n  priority of source n            0x001000  pending bits
 //   0x002000        enables, context 0              0x002080  enables, context 1
 //   0x200000        threshold, context 0            0x200004  claim/complete, context 0
 //   0x201000        threshold, context 1            0x201004  claim/complete, context 1
 // Sources are level-sensitive. Source 0 does not exist.
-module fable_plic #(
+module legend_plic #(
     parameter int NSRC = 31,     // sources 1..NSRC
     parameter int PRIO_BITS = 3
 ) (

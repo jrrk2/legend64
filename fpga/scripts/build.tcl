@@ -1,4 +1,4 @@
-# Synthesise, place, route and write the bitstream for fable64 on the VC707 (Vivado 2020.1).
+# Synthesise, place, route and write the bitstream for legend64 on the VC707 (Vivado 2020.1).
 # usage: vivado -mode batch -source build.tcl -tclargs <riscv_root> <out_dir> <sys_div> <clk_hz> <build_id_hex> [mig|litedram]
 #        [cache_lines_log2 (10 = 64 KiB)] [tlb_entries (8)] [threads (8)]
 # The last argument picks the DDR3 controller: the Xilinx memory interface (default) or the
@@ -15,10 +15,10 @@ create_project -in_memory -part xc7vx485tffg1761-2
 set_property board_part xilinx.com:vc707:part0:1.4 [current_project]
 
 read_verilog -sv [list \
-    $root/rtl/fable64.sv $root/rtl/fable64_rvc.sv $root/rtl/fable64_fpu.sv \
-    $root/fpga/rtl/fable_uart16550.sv $root/fpga/rtl/fable_plic.sv $root/fpga/rtl/fable_eth.sv \
-    $root/fpga/rtl/fable_ram.sv $root/fpga/rtl/fable_cache.sv $root/fpga/rtl/mig_line_adapter.sv $root/fpga/rtl/litedram_line_adapter.sv \
-    $root/fpga/rtl/fable64_soc.sv $root/fpga/rtl/fable64_vc707.sv $root/fpga/rtl/fable_sgmii.sv \
+    $root/rtl/legend64.sv $root/rtl/legend64_rvc.sv $root/rtl/legend64_fpu.sv \
+    $root/fpga/rtl/legend_uart16550.sv $root/fpga/rtl/legend_plic.sv $root/fpga/rtl/legend_eth.sv \
+    $root/fpga/rtl/legend_ram.sv $root/fpga/rtl/legend_cache.sv $root/fpga/rtl/mig_line_adapter.sv $root/fpga/rtl/litedram_line_adapter.sv \
+    $root/fpga/rtl/legend64_soc.sv $root/fpga/rtl/legend64_vc707.sv $root/fpga/rtl/legend_sgmii.sv \
     $eth/eth_mac_1g.sv $eth/axis_gmii_rx.sv $eth/axis_gmii_tx.sv $eth/rgmii_lfsr.sv]
 read_verilog [list $eth/liteeth_sgmii_phy.v]
 if {$litedram} {
@@ -29,10 +29,10 @@ if {$litedram} {
     set_property generate_synth_checkpoint false [get_files ddr3_mig.xci]
     generate_target all [get_ips ddr3_mig]
 }
-read_xdc -unmanaged $root/fpga/fable64_vc707.xdc
-set_property PROCESSING_ORDER LATE [get_files fable64_vc707.xdc]
+read_xdc -unmanaged $root/fpga/legend64_vc707.xdc
+set_property PROCESSING_ORDER LATE [get_files legend64_vc707.xdc]
 
-synth_design -top fable64_vc707 -part xc7vx485tffg1761-2 -verilog_define SYNTHESIS \
+synth_design -top legend64_vc707 -part xc7vx485tffg1761-2 -verilog_define SYNTHESIS \
     -generic LITEDRAM=1'b$litedram -generic SYS_DIV=$sys_div -generic CLK_HZ=$clk_hz -generic BUILD_ID=32'h$build_id \
     -generic BOOT_HEX=$root/build/fpga/boot.hex -generic CACHE_LINES_LOG2=$cache_log2 -generic TLB_ENTRIES=$tlb_entries
 write_checkpoint -force $out/synth.dcp
@@ -53,5 +53,5 @@ report_timing_summary -file $out/timing.rpt -max_paths 10
 report_clocks -file $out/clocks.rpt
 report_cdc -file $out/cdc.rpt
 puts "STAGE route done WNS=[get_property SLACK [get_timing_paths -max_paths 1 -setup]] WHS=[get_property SLACK [get_timing_paths -max_paths 1 -hold]]"
-write_bitstream -force $out/fable64_vc707.bit
+write_bitstream -force $out/legend64_vc707.bit
 puts "STAGE bitstream done"

@@ -1,6 +1,6 @@
-# fable64 Linux software stack
+# legend64 Linux software stack
 
-Software for the fable64 RV64GC soft processor on the Xilinx VC707: OpenSBI,
+Software for the legend64 RV64GC soft processor on the Xilinx VC707: OpenSBI,
 a mainline Linux kernel, device trees, a busybox initramfs, and the scripts to
 make a Debian riscv64 NFS root. Everything was built without root and proven on
 QEMU; nothing here has run on the real hardware yet (see "Verified / not
@@ -11,12 +11,12 @@ verified" at the end).
 | Path | What |
 |---|---|
 | `out/Image` | Linux 6.18.64 kernel (unmodified mainline source, own config) |
-| `out/fable64-vc707.dtb` | board device tree, NFS-root command line |
-| `out/fable64-vc707-initramfs.dtb` | same board, boots the initramfs instead |
+| `out/legend64-vc707.dtb` | board device tree, NFS-root command line |
+| `out/legend64-vc707-initramfs.dtb` | same board, boots the initramfs instead |
 | `out/initramfs.cpio.gz` | Debian `busybox-static` (riscv64, unmodified) + `/init` |
 | `out/bootmon-shim.bin` | 16-byte stand-in for the boot monitor, QEMU rehearsal only |
-| `dts/fable64-vc707.dts` | device tree source (copies of both `.dtb` are kept next to it) |
-| `kernel/fable64_defconfig` | kernel configuration (generated from `kernel/fable64.fragment`) |
+| `dts/legend64-vc707.dts` | device tree source (copies of both `.dtb` are kept next to it) |
+| `kernel/legend64_defconfig` | kernel configuration (generated from `kernel/legend64.fragment`) |
 | `kernel/patches/` | optional driver patch picked up by the build (empty: no source patch is needed) |
 | `build-kernel.sh`, `build-initramfs.sh`, `build-dtb.sh` | rebuild scripts |
 | `run-qemu.sh`, `scripts/qemu-drive.py` | QEMU launcher and a small non-interactive console driver |
@@ -38,7 +38,7 @@ software-managed A/D bits, misaligned accesses trap.
 | CLINT | `0x0200_0000` | `0x10000` | M-soft 3, M-timer 7 | `sifive,clint0`, `riscv,clint0` |
 | PLIC | `0x0c00_0000` | `0x400_0000` | M-ext 11, S-ext 9 | `sifive,plic-1.0.0`, `riscv,plic0`, `riscv,ndev = 31` |
 | UART | `0x1000_0000` | `0x100` | PLIC 10 | `ns16550a`, reg-shift 0, reg-io-width 1, 1843200 Hz, 115200 |
-| Ethernet | `0x3000_0000` | `0x1000` | PLIC 2 | `fable,eth` (**placeholder, driver pending**) |
+| Ethernet | `0x3000_0000` | `0x1000` | PLIC 2 | `legend,eth` (**placeholder, driver pending**) |
 | RAM | `0x8000_0000` | 1 GiB | | |
 
 `timebase-frequency` is 25 MHz. It is one value: `TIMEBASE_HZ=50000000 ./build-dtb.sh`
@@ -53,7 +53,7 @@ Network: board 192.168.1.51, NFS server (this host) 192.168.1.176, netmask
 |---|---|---|
 | `/home/jonathan/riscv/tools/qemu/usr/lib/riscv64-linux-gnu/opensbi/generic/fw_jump.bin` | 275888 | `0x8000_0000` |
 | `/home/jonathan/riscv/linux/out/Image` | 6718464 | `0x8020_0000` |
-| `/home/jonathan/riscv/linux/out/fable64-vc707.dtb` (NFS root) **or** `out/fable64-vc707-initramfs.dtb` | 2090 / 2050 | `0x8600_0000` |
+| `/home/jonathan/riscv/linux/out/legend64-vc707.dtb` (NFS root) **or** `out/legend64-vc707-initramfs.dtb` | 2090 / 2050 | `0x8600_0000` |
 | `/home/jonathan/riscv/linux/out/initramfs.cpio.gz` (only with the initramfs DTB) | 1036696 | `0x8800_0000` |
 
 Then jump to `0x8000_0000` in M-mode with `a0 = 0`, `a1 = 0x8600_0000`.
@@ -76,7 +76,7 @@ Why these addresses are safe:
 
 Command lines (in `/chosen/bootargs`):
 
-* NFS root: `console=ttyS0,115200 earlycon root=/dev/nfs nfsroot=192.168.1.176:/srv/nfs/fable64,vers=3,tcp rw ip=192.168.1.51::192.168.1.1:255.255.255.0:fable64:eth0:off`
+* NFS root: `console=ttyS0,115200 earlycon root=/dev/nfs nfsroot=192.168.1.176:/srv/nfs/fable64,vers=3,tcp rw ip=192.168.1.51::192.168.1.1:255.255.255.0:legend64:eth0:off`
 * initramfs: `console=ttyS0,115200 earlycon rdinit=/init`
 * any other: `BOOTARGS_NFS='...' ./build-dtb.sh` or `BOOTARGS_INITRAMFS='...' ./build-dtb.sh`.
   If the UART itself is suspect, `earlycon=sbi` prints through OpenSBI instead.
@@ -100,8 +100,8 @@ Nothing needs root. Builds use at most 12 jobs (`JOBS=` to lower it).
   patch.** `diff -r` of the build tree against a fresh unpack is empty.
 * Compiler: Ubuntu `gcc-riscv64-linux-gnu` 15.2.0 / binutils 2.46, unpacked with
   `dpkg -x` under `tools/root` (the debs are in `tools/debs`).
-* Config: `kernel/fable64_defconfig`. It is generated from the commented
-  `kernel/fable64.fragment` by `./build-kernel.sh regen-defconfig`
+* Config: `kernel/legend64_defconfig`. It is generated from the commented
+  `kernel/legend64.fragment` by `./build-kernel.sh regen-defconfig`
   (`allnoconfig` + fragment, then `savedefconfig`); edit the fragment, not the
   defconfig. `./build-kernel.sh menuconfig` is there for experiments.
 * What is in it: RV64GC with FPU, single hart (`SMP=n`, so no IPIs are ever
@@ -123,26 +123,26 @@ Nothing needs root. Builds use at most 12 jobs (`JOBS=` to lower it).
 * SBI system reset is used for reboot/poweroff, but the board has no reset
   device for OpenSBI to drive, so `reboot` and `poweroff` just halt there.
 
-### Ethernet driver ("fable,eth") - pending
+### Ethernet driver ("legend,eth") - pending
 
 The MAC is a native descriptor-ring device that DMAs to and from system RAM.
 Its register interface is not fixed yet and **no driver exists**: the device
 tree has a placeholder node, nothing binds to it, and the NFS-root DTB cannot
 reach its root file system until the driver is added. The build is ready for it:
 
-* Put the driver in a patch at `kernel/patches/fable-eth.patch` (`-p1`,
+* Put the driver in a patch at `kernel/patches/legend-eth.patch` (`-p1`,
   relative to the kernel source root). `build-kernel.sh` applies it when the
-  file exists, appends `CONFIG_FABLE_ETH=y` to the config, and fails loudly if
+  file exists, appends `CONFIG_LEGEND_ETH=y` to the config, and fails loudly if
   that symbol does not survive. Without the file it builds the plain kernel.
   If the patch changes or is removed, the previously applied one is reverted
   first, so the source tree always matches the patch file.
-* The easy way: `kernel/make-fable-eth-patch.sh /path/to/fable_eth.c` writes
-  that patch for you. It adds `drivers/net/ethernet/fable/{fable_eth.c,Kconfig,Makefile}`
+* The easy way: `kernel/make-legend-eth-patch.sh /path/to/legend_eth.c` writes
+  that patch for you. It adds `drivers/net/ethernet/legend/{legend_eth.c,Kconfig,Makefile}`
   and the only two edits to existing files (one `source` line in
   `drivers/net/ethernet/Kconfig`, one `obj-` line in
   `drivers/net/ethernet/Makefile`).
 * Extra config lines the driver needs (for example `CONFIG_PHYLIB=y`) go in
-  `kernel/patches/fable-eth.config`, or as `select` lines in the driver's Kconfig.
+  `kernel/patches/legend-eth.config`, or as `select` lines in the driver's Kconfig.
 * The plumbing was tested with a stub (`kernel/patches/example/`,
   `logs/kernel-build-with-stub-patch.log`): applied, built in, reverted cleanly.
 * DMA: nothing more is needed. RISC-V devices are DMA-coherent by default and
@@ -185,7 +185,7 @@ Could not be turned off in QEMU 10.2.1:
 
 Differences of the machine: QEMU's CLINT ticks at 10 MHz and its PLIC has 95
 sources in its own device tree; it has virtio devices, a reset device and an
-RTC that the board lacks; it has no `fable,eth`.
+RTC that the board lacks; it has no `legend,eth`.
 
 ## Debian NFS root (`nfsroot/`, needs root - not run here)
 
@@ -201,15 +201,15 @@ sudo nfsroot/setup-nfs-server.sh    # 3. nfs-kernel-server and the export
 ```
 
 * Step 2 boots QEMU (this kernel, the cut-down CPU) with the tree as its root
-  file system over virtio-9p and `init=/fable64-second-stage.sh`. That script
-  (`nfsroot/target/fable64-second-stage.sh`) runs `debootstrap --second-stage`
+  file system over virtio-9p and `init=/legend64-second-stage.sh`. That script
+  (`nfsroot/target/legend64-second-stage.sh`) runs `debootstrap --second-stage`
   and then configures the system. QEMU runs as root here because 9p
   `passthrough` must create root-owned files.
 * The alternative is the board itself: boot the NFS-root DTB with
-  `init=/fable64-second-stage.sh fable.epoch=<unix time>` appended to the
+  `init=/legend64-second-stage.sh legend.epoch=<unix time>` appended to the
   command line (`BOOTARGS_NFS=... ./build-dtb.sh`). It is the same script, but
   expect it to take hours at 25 MHz, and it needs the Ethernet driver first.
-* Configuration applied: hostname `fable64`; root logs in on the console with
+* Configuration applied: hostname `legend64`; root logs in on the console with
   an empty password; `serial-getty@ttyS0` enabled; `/etc/fstab` without a root
   line (the kernel mounts `/`); `/etc/network/interfaces` with only `lo`,
   networkd disabled and no DHCP client, so nothing touches the kernel-configured
@@ -229,7 +229,7 @@ Result: **stage 1 works, stage 2 FAILED in the rehearsal and is unproven.**
 * Worked: carrying that tree as a tar into a QEMU 9p `mapped-xattr` export from
   the busybox initramfs (`logs/rehearsal-unpack-into-9p.log`, `UNPACK_RC=0`).
 * Worked: the kernel mounting a 9p root and starting
-  `/fable64-second-stage.sh` as init, which set the clock and started
+  `/legend64-second-stage.sh` as init, which set the clock and started
   `debootstrap --second-stage`.
 * **Failed:** the first `dpkg --install` (base-passwd) stopped with
   `tar: ./control: Cannot change ownership to uid 0, gid 0: Operation not permitted`
@@ -281,7 +281,7 @@ Not verified:
 
 * Anything on the real hardware.
 * Ethernet: no driver, no QEMU model. NFS root on the board cannot work until
-  the `fable,eth` driver exists.
+  the `legend,eth` driver exists.
 * A real NFS root mount, the NFS server setup, and all three root scripts
   (`make-nfsroot.sh`, `second-stage-qemu.sh` as root, `setup-nfs-server.sh`).
 * Debian beyond stage 1: the second stage failed in the unprivileged rehearsal

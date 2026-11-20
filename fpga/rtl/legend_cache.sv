@@ -1,10 +1,10 @@
-// fable_cache: one direct-mapped cache in front of the DDR3 memory, shared by the instruction
-// and data ports of fable64 so that code written through the data port is what gets fetched.
+// legend_cache: one direct-mapped cache in front of the DDR3 memory, shared by the instruction
+// and data ports of legend64 so that code written through the data port is what gets fetched.
 //
 // Lines are 64 bytes, which is exactly one burst of the memory controller (512 bits), so a
 // miss is one read and an eviction of a modified line is one write. Each core port has its
 // own port on the block RAMs; a hit answers in the cycle after the request, which is the
-// timing fable64's bus expects. A store takes one extra cycle. While a miss is handled both
+// timing legend64's bus expects. A store takes one extra cycle. While a miss is handled both
 // ports wait.
 //
 // A third, "device" port lets a DMA master (the Ethernet MAC) read and write memory through
@@ -15,7 +15,7 @@
 // Memory side: a four-phase request/acknowledge handshake carrying a whole line. mem_addr,
 // mem_we and mem_wdata are held steady while mem_req is high, and mem_rdata is steady while
 // mem_ack is high, so the other side may sit in a different clock domain.
-module fable_cache #(
+module legend_cache #(
     parameter int LINES_LOG2 = 10,   // 1024 lines = 64 KiB
     parameter int ADDR_BITS  = 30    // 1 GiB
 ) (
@@ -71,9 +71,9 @@ module fable_cache #(
   logic [1:0]     t_we;
   logic [15:0]    a_tag, b_tag, t_wd, v_tag;   // {valid, modified, tag}
 
-  fable_tdp_be #(.AW(IW), .NB(64)) u_data (
+  legend_tdp_be #(.AW(IW), .NB(64)) u_data (
       .clk, .a_addr(a_idx), .a_q(a_line), .b_addr(b_idx), .b_we(b_we), .b_d(b_wline), .b_q(b_line));
-  fable_tdp_be #(.AW(IW), .NB(2)) u_tag (
+  legend_tdp_be #(.AW(IW), .NB(2)) u_tag (
       .clk, .a_addr(a_idx), .a_q(a_tag), .b_addr(b_idx), .b_we(t_we), .b_d(t_wd), .b_q(b_tag));
 
   function automatic logic [IW-1:0] idx(input logic [ADDR_BITS-1:0] a); return a[6+:IW]; endfunction

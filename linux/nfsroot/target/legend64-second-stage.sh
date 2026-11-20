@@ -1,21 +1,21 @@
 #!/bin/sh
 # Runs INSIDE the riscv64 Debian tree as PID 1 (kernel option
-# init=/fable64-second-stage.sh), either under QEMU (second-stage-qemu.sh) or on
-# the board itself.  Finishes debootstrap, then applies the fable64 settings.
-# Kernel command line extras understood:  fable.epoch=<unix time>  (sets the
+# init=/legend64-second-stage.sh), either under QEMU (second-stage-qemu.sh) or on
+# the board itself.  Finishes debootstrap, then applies the legend64 settings.
+# Kernel command line extras understood:  legend.epoch=<unix time>  (sets the
 # clock first; there is no RTC, and dpkg/apt dislike 1970).
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 export DEBIAN_FRONTEND=noninteractive LC_ALL=C LANG=C
-HOSTNAME_=fable64
+HOSTNAME_=legend64
 NFS_SERVER=192.168.1.176
 GATEWAY=192.168.1.1
 
-fail() { echo; echo "FABLE64-SECOND-STAGE: FAILED: $*"; echo "dropping to a shell"; exec /bin/sh; }
+fail() { echo; echo "LEGEND64-SECOND-STAGE: FAILED: $*"; echo "dropping to a shell"; exec /bin/sh; }
 
 [ -e /proc/cmdline ] || mount -t proc proc /proc
 [ -d /sys/kernel ] || mount -t sysfs sysfs /sys
 mount -o remount,rw / 2>/dev/null
-epoch=$(sed -n 's/.*fable\.epoch=\([0-9]*\).*/\1/p' /proc/cmdline)
+epoch=$(sed -n 's/.*legend\.epoch=\([0-9]*\).*/\1/p' /proc/cmdline)
 [ -n "$epoch" ] && date -s "@$epoch" >/dev/null && echo "clock set to $(date -u)"
 
 # Only for the unprivileged rehearsal (QEMU 9p "mapped-xattr" on a tree that was
@@ -28,14 +28,14 @@ if [ "$(stat -c %u /)" != 0 ]; then
 fi
 
 if [ -x /debootstrap/debootstrap ]; then
-    echo "FABLE64-SECOND-STAGE: running debootstrap --second-stage (takes a while)"
+    echo "LEGEND64-SECOND-STAGE: running debootstrap --second-stage (takes a while)"
     /debootstrap/debootstrap --second-stage || { tail -n 40 /debootstrap/debootstrap.log; fail "debootstrap --second-stage"; }
 else
-    echo "FABLE64-SECOND-STAGE: /debootstrap is gone - second stage already done, only (re)configuring"
+    echo "LEGEND64-SECOND-STAGE: /debootstrap is gone - second stage already done, only (re)configuring"
 fi
 [ -e /proc/cmdline ] || mount -t proc proc /proc
 
-echo "FABLE64-SECOND-STAGE: configuring"
+echo "LEGEND64-SECOND-STAGE: configuring"
 echo "$HOSTNAME_" > /etc/hostname
 cat > /etc/hosts <<EOT
 127.0.0.1	localhost
@@ -75,14 +75,14 @@ systemctl enable serial-getty@ttyS0.service >/dev/null 2>&1
 
 # A 25 MHz CPU is 100x slower than what the default timeouts assume.
 mkdir -p /etc/systemd/system.conf.d /etc/systemd/journald.conf.d
-cat > /etc/systemd/system.conf.d/10-fable64.conf <<EOT
+cat > /etc/systemd/system.conf.d/10-legend64.conf <<EOT
 [Manager]
 DefaultTimeoutStartSec=30min
 DefaultTimeoutStopSec=10min
 DefaultDeviceTimeoutSec=30min
 RuntimeWatchdogSec=off
 EOT
-cat > /etc/systemd/journald.conf.d/10-fable64.conf <<EOT
+cat > /etc/systemd/journald.conf.d/10-legend64.conf <<EOT
 [Journal]
 # keep the journal in RAM: no sync-heavy writes over NFS
 Storage=volatile
@@ -97,9 +97,9 @@ deb http://security.debian.org/debian-security trixie-security main
 EOT
 apt-get clean
 
-echo "FABLE64-SECOND-STAGE: installed $(dpkg-query -W -f='${Status}\n' | grep -c '^install ok installed') packages, $(dpkg --audit | wc -l) audit problems"
+echo "LEGEND64-SECOND-STAGE: installed $(dpkg-query -W -f='${Status}\n' | grep -c '^install ok installed') packages, $(dpkg --audit | wc -l) audit problems"
 sync
-echo "FABLE64-SECOND-STAGE: COMPLETE"
+echo "LEGEND64-SECOND-STAGE: COMPLETE"
 # PID 1 must not exit.  Under QEMU this powers the VM off; on the board (no
 # power-off device) it just halts - reset the board afterwards.
 sync; sleep 1

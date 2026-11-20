@@ -32,7 +32,7 @@ module tb;
 
   localparam int unsigned SIM_CLK_HZ = 50_000_000;
   localparam int unsigned SIM_BAUD   = 115_200;      // as on the board: transmit timing matters to the driver
-  fable64_soc #(.CLK_HZ(SIM_CLK_HZ), .BAUD(SIM_BAUD), .BUILD_ID(32'h51a0_0003),
+  legend64_soc #(.CLK_HZ(SIM_CLK_HZ), .BAUD(SIM_BAUD), .BUILD_ID(32'h51a0_0003),
                 .BOOT_HEX("build/fpga/boot_linuxsim.hex")) dut (
       .clk, .rst, .ddr_ready(1'b1), .ddr_soft(1'b0),
       .dcsr_req(), .dcsr_we(), .dcsr_addr(), .dcsr_wdata(), .dcsr_ack(1'b0), .dcsr_rdata(32'h0),

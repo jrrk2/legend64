@@ -1,5 +1,5 @@
 // What LiteX's liblitedram (sdram.c, accessors.c) needs from its surroundings, provided by the
-// fable64 boot monitor: formatted output, the post-levelling memory test, and delays.
+// legend64 boot monitor: formatted output, the post-levelling memory test, and delays.
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdbool.h>

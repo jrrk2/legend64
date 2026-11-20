@@ -1,4 +1,4 @@
-// fable64_fpu: IEEE 754 single and double precision unit for the F and D extensions.
+// legend64_fpu: IEEE 754 single and double precision unit for the F and D extensions.
 //
 // Multi-cycle and unpipelined: the core holds the instruction and its operands steady from
 // `start` until `done && accept`. All arithmetic funnels into one back end:
@@ -12,7 +12,7 @@
 // one adder and one rounding path to get right. Compares, sign injection, min/max, classify,
 // moves and float-to-integer conversion are combinational and finish in the start cycle.
 
-module fable64_fpu (
+module legend64_fpu (
     input  logic        clk,
     input  logic        rst_n,
     input  logic        start,    // an FP operation is in the execute stage (level)

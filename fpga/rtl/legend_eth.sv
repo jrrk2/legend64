@@ -1,6 +1,6 @@
-// fable_eth: descriptor-ring Ethernet MAC front end that moves packets by DMA through the
-// coherent device port of the CPU's cache (fable_cache). The byte-stream MAC, PCS and PHY
-// below it are synthgui's (eth_mac_1g and LiteEth's SGMII PHY, in fable_sgmii); this module sits
+// legend_eth: descriptor-ring Ethernet MAC front end that moves packets by DMA through the
+// coherent device port of the CPU's cache (legend_cache). The byte-stream MAC, PCS and PHY
+// below it are synthgui's (eth_mac_1g and LiteEth's SGMII PHY, in legend_sgmii); this module sits
 // between their AXI-stream interfaces on the PCS's receive and transmit clocks and memory on the
 // system clock.
 //
@@ -45,7 +45,7 @@
 
 // Passes a multi-bit value to another clock domain: the value is held steady while a toggle
 // goes round a request/acknowledge loop.
-module fable_sync_val #(
+module legend_sync_val #(
     parameter int W = 12
 ) (
     input  logic         src_clk,
@@ -69,7 +69,7 @@ endmodule
 
 // Dual-clock FIFO of 72-bit words in block RAM. Written words become visible to the reader
 // only when committed, and can be discarded instead: whole packets or nothing.
-module fable_pkt_fifo #(
+module legend_pkt_fifo #(
     parameter int AW = 10
 ) (
     input  logic        wclk,
@@ -109,8 +109,8 @@ module fable_pkt_fifo #(
     end
   end
 
-  fable_sync_val #(.W(AW + 1)) u_c2r (.src_clk(wclk), .src_val(wr_commit), .dst_clk(rclk), .dst_val(commit_r));
-  fable_sync_val #(.W(AW + 1)) u_r2w (.src_clk(rclk), .src_val(rd_ptr), .dst_clk(wclk), .dst_val(rd_ptr_w));
+  legend_sync_val #(.W(AW + 1)) u_c2r (.src_clk(wclk), .src_val(wr_commit), .dst_clk(rclk), .dst_val(commit_r));
+  legend_sync_val #(.W(AW + 1)) u_r2w (.src_clk(rclk), .src_val(rd_ptr), .dst_clk(wclk), .dst_val(rd_ptr_w));
 
   assign r_valid = rd_ptr != commit_r;
   assign rd_next = rd_ptr + (AW+1)'(r_valid && r_ready);
@@ -121,7 +121,7 @@ module fable_pkt_fifo #(
   end
 endmodule
 
-module fable_eth #(
+module legend_eth #(
     parameter int RX_FIFO_AW = 14     // receive FIFO depth in 8-byte words: 14 is 128 KiB
 ) (
     input  logic        clk,          // system clock
@@ -135,7 +135,7 @@ module fable_eth #(
     output logic [31:0] reg_rdata,
     output logic        irq,
 
-    // coherent memory port (to fable_cache's device port); addresses are offsets into RAM
+    // coherent memory port (to legend_cache's device port); addresses are offsets into RAM
     output logic        e_req,
     output logic        e_we,
     output logic [29:0] e_addr,
@@ -291,11 +291,11 @@ module fable_eth #(
 
   logic        rxf_rvalid, rxf_rready;
   logic [71:0] rxf_rdata;
-  fable_sync_val #(.W(16)) u_cf (.src_clk(mac_clk), .src_val(m_fifo), .dst_clk(clk), .dst_val(cnt_fifo));
-  fable_sync_val #(.W(16)) u_cb (.src_clk(mac_clk), .src_val(m_bad),  .dst_clk(clk), .dst_val(cnt_bad));
-  fable_sync_val #(.W(16)) u_cl (.src_clk(mac_clk), .src_val(m_long), .dst_clk(clk), .dst_val(cnt_long));
+  legend_sync_val #(.W(16)) u_cf (.src_clk(mac_clk), .src_val(m_fifo), .dst_clk(clk), .dst_val(cnt_fifo));
+  legend_sync_val #(.W(16)) u_cb (.src_clk(mac_clk), .src_val(m_bad),  .dst_clk(clk), .dst_val(cnt_bad));
+  legend_sync_val #(.W(16)) u_cl (.src_clk(mac_clk), .src_val(m_long), .dst_clk(clk), .dst_val(cnt_long));
 
-  fable_pkt_fifo #(.AW(RX_FIFO_AW)) u_rxf (
+  legend_pkt_fifo #(.AW(RX_FIFO_AW)) u_rxf (
       .wclk(mac_clk), .wrst(mac_rst), .w_valid(rxf_wvalid), .w_data(rxf_wdata), .w_commit(rxf_commit),
       .w_abort(rxf_abort), .w_patch(1'b0), .w_patch_idx('0), .w_full(rxf_full), .w_free(),
       .rclk(clk), .rrst(rst), .r_valid(rxf_rvalid), .r_data(rxf_rdata), .r_ready(rxf_rready)
@@ -525,7 +525,7 @@ module fable_eth #(
 
   logic        txf_rvalid, txf_rready;
   logic [71:0] txf_rdata;
-  fable_pkt_fifo #(.AW(10)) u_txf (
+  legend_pkt_fifo #(.AW(10)) u_txf (
       .wclk(clk), .wrst(rst), .w_valid(txf_wvalid), .w_data(txf_wdata), .w_commit(txf_commit),
       .w_abort(txf_abort), .w_patch(txf_patch), .w_patch_idx(10'(cs_field[8:3])), .w_full(txf_full), .w_free(txf_free),
       .rclk(mac_tx_clk), .rrst(mac_tx_rst), .r_valid(txf_rvalid), .r_data(txf_rdata), .r_ready(txf_rready)

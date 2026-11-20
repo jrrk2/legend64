@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: (GPL-2.0-only OR MIT)
 /*
- * fable64 on the Xilinx VC707 - one RV64GC hart, Sv39, 1 GiB RAM.
+ * legend64 on the Xilinx VC707 - one RV64GC hart, Sv39, 1 GiB RAM.
  * The memory map mirrors QEMU's "virt" machine for CLINT, PLIC and UART.
  *
  * This file goes through the C preprocessor (see build-dtb.sh):
@@ -13,7 +13,7 @@
 #define TIMEBASE_HZ 25000000
 #endif
 #ifndef BOOTARGS
-#define BOOTARGS "console=ttyS0,115200 earlycon root=/dev/nfs nfsroot=192.168.1.176:/srv/nfs/fable64,vers=3,tcp,rsize=32768,wsize=32768 rw ip=192.168.1.51::192.168.1.1:255.255.255.0:fable64:eth0:off"
+#define BOOTARGS "console=ttyS0,115200 earlycon root=/dev/nfs nfsroot=192.168.1.176:/srv/nfs/fable64,vers=3,tcp,rsize=32768,wsize=32768 rw ip=192.168.1.51::192.168.1.1:255.255.255.0:legend64:eth0:off"
 #endif
 
 /dts-v1/;
@@ -21,8 +21,8 @@
 / {
 	#address-cells = <2>;
 	#size-cells = <2>;
-	compatible = "fable,fable64-vc707", "fable,fable64";
-	model = "fable64 RV64GC on Xilinx VC707";
+	compatible = "legend,legend64-vc707", "legend,legend64";
+	model = "legend64 RV64GC on Xilinx VC707";
 
 	aliases {
 		serial0 = &uart0;
@@ -45,7 +45,7 @@
 
 		cpu0: cpu@0 {
 			device_type = "cpu";
-			compatible = "fable,fable64", "riscv";
+			compatible = "legend,legend64", "riscv";
 			reg = <0>;
 			status = "okay";
 			/* No Zicntr (no time CSR), Zihpm, Sstc, Zb*, V, Zicbo*, PMP. */
@@ -114,11 +114,11 @@
 		/*
 		 * Native descriptor-ring MAC, DMA straight to/from system RAM.
 		 * PLACEHOLDER: the register interface and its Linux driver
-		 * (CONFIG_FABLE_ETH, kernel/patches/fable-eth.patch) are pending;
+		 * (CONFIG_LEGEND_ETH, kernel/patches/legend-eth.patch) are pending;
 		 * until then nothing binds to this node.
 		 */
 		eth0: ethernet@30000000 {
-			compatible = "fable,eth";
+			compatible = "legend,eth";
 			reg = <0x0 0x30000000 0x0 0x1000>;
 			interrupt-parent = <&plic>;
 			interrupts = <2>;

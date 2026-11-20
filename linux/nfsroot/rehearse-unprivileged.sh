@@ -39,16 +39,16 @@ fi
 export TARGET=$R/rootfs9p SECURITY_MODEL=mapped-xattr
 if [ -e "$R/rootfs9p/debootstrap" ]; then
     "$drive" --timeout 5400 --log "$logs/rehearsal-second-stage-qemu9p.log" \
-        'FABLE64-SECOND-STAGE: (COMPLETE|FAILED)|Kernel panic' '(Power down|dropping to a shell|end Kernel panic)' -- \
+        'LEGEND64-SECOND-STAGE: (COMPLETE|FAILED)|Kernel panic' '(Power down|dropping to a shell|end Kernel panic)' -- \
         "$here/second-stage-qemu.sh" > /dev/null
-    grep -a -q 'FABLE64-SECOND-STAGE: COMPLETE' "$logs/rehearsal-second-stage-qemu9p.log"
+    grep -a -q 'LEGEND64-SECOND-STAGE: COMPLETE' "$logs/rehearsal-second-stage-qemu9p.log"
 fi
 
 # boot the finished Debian (systemd) and log in on the serial console
 "$drive" --timeout 3600 --log "$logs/rehearsal-debian-boot-qemu9p.log" \
-    'fable64 login: =>root' \
-    'root@fable64:~# =>uname -a; cat /etc/debian_version; dpkg --print-architecture; systemctl is-system-running; systemctl --failed --no-pager' \
-    'root@fable64:~# =>systemd-analyze --no-pager; ps -e | wc -l; free -m; ip -br addr; findmnt -n /; echo DEBIAN_OK_$((6*7))' \
-    'DEBIAN_OK_42' 'root@fable64:~# =>systemctl poweroff' 'reboot: Power down' -- \
+    'legend64 login: =>root' \
+    'root@legend64:~# =>uname -a; cat /etc/debian_version; dpkg --print-architecture; systemctl is-system-running; systemctl --failed --no-pager' \
+    'root@legend64:~# =>systemd-analyze --no-pager; ps -e | wc -l; free -m; ip -br addr; findmnt -n /; echo DEBIAN_OK_$((6*7))' \
+    'DEBIAN_OK_42' 'root@legend64:~# =>systemctl poweroff' 'reboot: Power down' -- \
     "$here/second-stage-qemu.sh" boot > /dev/null
 echo "rehearsal complete"

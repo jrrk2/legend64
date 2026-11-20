@@ -1,4 +1,4 @@
-// Simulation of fable64_soc with a behavioural line memory in place of the DDR3 controller and
+// Simulation of legend64_soc with a behavioural line memory in place of the DDR3 controller and
 // a scripted Ethernet peer in place of the MAC. Prints what the monitor writes to the UART.
 //
 // After the monitor's prompt appears the peer sends an ARP request, then a UDP loader "write"
@@ -17,7 +17,7 @@ module tb;
   longint cycles = 0, max_cycles = 400_000_000, reads = 0, writes = 0;
   bit self_test;
 
-  fable64_soc #(.CLK_HZ(50_000_000), .BAUD(3_000_000), .BUILD_ID(32'h51a0_0002),
+  legend64_soc #(.CLK_HZ(50_000_000), .BAUD(3_000_000), .BUILD_ID(32'h51a0_0002),
                 .BOOT_HEX("build/fpga/boot_sim.hex")) dut (
       .clk, .rst, .ddr_ready(1'b1), .ddr_soft(1'b0),
       .dcsr_req(), .dcsr_we(), .dcsr_addr(), .dcsr_wdata(), .dcsr_ack(1'b0), .dcsr_rdata(32'h0),

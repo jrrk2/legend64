@@ -1,6 +1,6 @@
 # LiteDRAM standalone core for the VC707's 1 GiB DDR3 SODIMM (MT8JTF12864HZ), DDR3-800:
 # the same PHY, module and clocking as synthgui's vc707_romlinux_clkctl LiteX design.
-# Generate with fpga/litedram/gen.sh. No CPU inside: the fable64 boot monitor runs the
+# Generate with fpga/litedram/gen.sh. No CPU inside: the legend64 boot monitor runs the
 # initialisation and levelling through the control (Wishbone) port.
 {
     "cpu":              "None",

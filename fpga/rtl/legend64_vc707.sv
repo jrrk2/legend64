@@ -1,12 +1,12 @@
-// fable64_vc707: fable64 on the Xilinx VC707 with 1 GiB of DDR3 and SGMII Ethernet.
+// legend64_vc707: legend64 on the Xilinx VC707 with 1 GiB of DDR3 and SGMII Ethernet.
 //
 //   200 MHz board clock -> Xilinx memory interface (DDR3-1600, 200 MHz user clock)
 //                          or LiteDRAM (DDR3-800, 100 MHz user clock)
 //                       -> MMCM -> clk_sys (the core, 1 GHz / SYS_DIV) and clk_mac (125 MHz)
 //
 // The SGMII PHY/PCS and the byte-stream MAC (LiteEth's PHY, eth_mac_1g and what they use) come
-// from synthgui's vc707_ethmin project, unmodified; fable_sgmii joins them.
-module fable64_vc707 #(
+// from synthgui's vc707_ethmin project, unmodified; legend_sgmii joins them.
+module legend64_vc707 #(
     parameter real         SYS_DIV  = 20.0,
     parameter bit          LITEDRAM = 1'b0,    // 0: Xilinx memory interface, 1: LiteDRAM
     parameter int unsigned CLK_HZ   = 50_000_000,
@@ -159,7 +159,7 @@ module fable64_vc707 #(
   wire [15:0] pcspma_status;
 
   wire eth_rx_clk, eth_rx_rst, eth_tx_clk, eth_tx_rst;
-  fable_sgmii u_eth (
+  legend_sgmii u_eth (
       .clk_int(clk_sys), .rst_int(rst_sys),
       .sgmii_rxp, .sgmii_rxn, .sgmii_txp, .sgmii_txn, .sgmii_refclk_p, .sgmii_refclk_n,
       .phy_reset_n(eth_rst_n),
@@ -172,7 +172,7 @@ module fable64_vc707 #(
 
   // ------------------------------------------------------------------ the system
   wire [7:0] soc_led;
-  fable64_soc #(.CLK_HZ(CLK_HZ), .BUILD_ID(BUILD_ID), .BOOT_HEX(BOOT_HEX),
+  legend64_soc #(.CLK_HZ(CLK_HZ), .BUILD_ID(BUILD_ID), .BOOT_HEX(BOOT_HEX),
                 .CACHE_LINES_LOG2(CACHE_LINES_LOG2), .TLB_ENTRIES(TLB_ENTRIES)) u_soc (
       .clk(clk_sys), .rst(rst_sys), .ddr_ready(ddr_ready || LITEDRAM), .ddr_soft(LITEDRAM),
       .mem_req, .mem_we, .mem_addr, .mem_wdata, .mem_ack, .mem_rdata,

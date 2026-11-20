@@ -1,4 +1,4 @@
-// fable_sgmii: the SGMII PHY/PCS (LiteEth's, from synthgui's vc707_ethmin project) and the
+// legend_sgmii: the SGMII PHY/PCS (LiteEth's, from synthgui's vc707_ethmin project) and the
 // byte-stream MAC (eth_mac_1g), with the MAC's two halves running directly on the PCS's own
 // receive and transmit clocks.
 //
@@ -7,9 +7,9 @@
 // that handles one frame at a time; under load it loses every frame that arrives while the
 // previous one is still being replayed, and a short frame sent right behind a long one. Here
 // nothing sits between PCS and MAC: frames can follow each other at the minimum gap in both
-// directions, and the clock crossing is done by fable_eth's FIFOs.
+// directions, and the clock crossing is done by legend_eth's FIFOs.
 `default_nettype none
-module fable_sgmii (
+module legend_sgmii (
     input  wire        clk_int,          // free-running clock for the PHY's reset sequencing
     input  wire        rst_int,
 

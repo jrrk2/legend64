@@ -13,13 +13,13 @@ set -u
 here=$(cd "$(dirname "$0")" && pwd); root=$(cd "$here/../.." && pwd)
 bit=${1:?bitstream, or - to measure the running system}
 L=$root/linux/out
-dtb=${2:-$L/fable64-vc707.dtb}
+dtb=${2:-$L/legend64-vc707.dtb}
 B=192.168.1.51; H=192.168.1.176
 big=/var/lib/apt/lists/deb.debian.org_debian_dists_trixie_main_binary-riscv64_Packages
 cold=/var/lib/apt/lists/deb.debian.org_debian_dists_trixie_main_i18n_Translation-en
 tree=/srv/nfs/fable64
 trap 'kill $(jobs -p) 2>/dev/null' EXIT
-ctl=$(mktemp -u /tmp/fable-ssh-XXXXXX)
+ctl=$(mktemp -u /tmp/legend-ssh-XXXXXX)
 S="ssh -o BatchMode=yes -o ConnectTimeout=90 -o StrictHostKeyChecking=accept-new -o ControlMaster=auto -o ControlPath=$ctl -o ControlPersist=120 $B"
 
 if [ "$bit" != - ]; then

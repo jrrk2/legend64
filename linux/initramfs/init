@@ -1,5 +1,5 @@
 #!/bin/sh
-# fable64 bring-up initramfs: Debian busybox-static, nothing else.
+# legend64 bring-up initramfs: Debian busybox-static, nothing else.
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin
 /bin/busybox mount -t devtmpfs devtmpfs /dev
 exec </dev/console >/dev/console 2>&1
@@ -14,7 +14,7 @@ ip link set lo up
 
 echo
 echo "=============================================================="
-echo " fable64 initramfs  -  $(uname -s -r -m)"
+echo " legend64 initramfs  -  $(uname -s -r -m)"
 echo " $(busybox | head -n 1)"
 echo " cpu : $(sed -n 's/^isa[^:]*: //p' /proc/cpuinfo | head -n 1)   mmu: $(sed -n 's/^mmu[^:]*: //p' /proc/cpuinfo | head -n 1)"
 echo " mem : $(sed -n 's/^MemTotal: *//p' /proc/meminfo)"

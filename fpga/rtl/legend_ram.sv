@@ -2,7 +2,7 @@
 
 // Two read ports, byte-enabled write on port B, one clock. Port B reads the old contents
 // during a write.
-module fable_tdp_be #(
+module legend_tdp_be #(
     parameter int AW = 10,
     parameter int NB = 4,            // width in bytes
     parameter     INIT_FILE = ""
@@ -28,7 +28,7 @@ module fable_tdp_be #(
 endmodule
 
 // True dual-clock RAM, 32 bits wide: port A byte-enabled read/write, port B word read/write.
-module fable_dc_ram32 #(
+module legend_dc_ram32 #(
     parameter int AW = 10
 ) (
     input  logic          a_clk,

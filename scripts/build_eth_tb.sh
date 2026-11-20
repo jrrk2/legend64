@@ -8,7 +8,7 @@ V=verilator; [ -x tools/verilator/bin/verilator ] && V=tools/verilator/bin/veril
 mkdir -p build/sim
 if [ "${1:-}" = small ]; then name=eth_tb_small; def=-DRX_FIFO_AW=8; else name=eth_tb; def=; fi
 $V --binary -O3 --x-assign 0 --x-initial 0 -Wno-fatal -Wno-WIDTHEXPAND -Wno-WIDTHTRUNC $def --top-module tb \
-  -Mdir build/sim/${name}_obj -o ../$name fpga/tb/tb_eth.sv fpga/rtl/fable_eth.sv > build/sim/$name.log 2>&1 \
+  -Mdir build/sim/${name}_obj -o ../$name fpga/tb/tb_eth.sv fpga/rtl/legend_eth.sv > build/sim/$name.log 2>&1 \
   || { grep -A6 "%Error" build/sim/$name.log | head -40; exit 1; }
 if [ "${1:-}" = small ]; then
   build/sim/$name +frames=1500 +slowmem +verilator+seed+1 | grep -E 'ERROR|receive:|over 1518|PASS|FAIL'

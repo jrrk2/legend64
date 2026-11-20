@@ -1,4 +1,4 @@
-// Reference vectors for fable64_fpu, computed on the host FPU (x86-64 SSE/FMA, IEEE 754 with
+// Reference vectors for legend64_fpu, computed on the host FPU (x86-64 SSE/FMA, IEEE 754 with
 // tininess detected after rounding, the same choice RISC-V makes).
 // Output lines: insn a b c x rm result flags   (hex; flags = NV DZ OF UF NX)
 // Where RISC-V and x86 differ by definition the expected value is computed explicitly:

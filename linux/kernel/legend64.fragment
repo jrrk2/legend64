@@ -1,6 +1,6 @@
-# fable64 kernel configuration fragment.
-# This is the human-maintained source of kernel/fable64_defconfig:
-#   make ARCH=riscv allnoconfig KCONFIG_ALLCONFIG=fable64.fragment ; make savedefconfig
+# legend64 kernel configuration fragment.
+# This is the human-maintained source of kernel/legend64_defconfig:
+#   make ARCH=riscv allnoconfig KCONFIG_ALLCONFIG=legend64.fragment ; make savedefconfig
 # (see build-kernel.sh regen-defconfig).  Everything not listed here is "n"
 # (or its non-EXPERT default).
 
@@ -49,9 +49,9 @@ CONFIG_RISCV_EMULATED_UNALIGNED_ACCESS=y
 CONFIG_IRQ_STACKS=y
 
 # ---- general -----------------------------------------------------------------
-CONFIG_LOCALVERSION="-fable64"
+CONFIG_LOCALVERSION="-legend64"
 # CONFIG_LOCALVERSION_AUTO is not set
-CONFIG_DEFAULT_HOSTNAME="fable64"
+CONFIG_DEFAULT_HOSTNAME="legend64"
 CONFIG_KERNEL_GZIP=y
 CONFIG_SYSVIPC=y
 CONFIG_POSIX_MQUEUE=y
@@ -122,9 +122,9 @@ CONFIG_NET_9P_VIRTIO=y
 CONFIG_NETDEVICES=y
 CONFIG_NET_CORE=y
 CONFIG_ETHERNET=y
-# The board MAC is the native "fable,eth" descriptor-ring device.  Its driver
-# is out of tree for now: build-kernel.sh applies patches/fable-eth.patch when
-# that file exists and then adds CONFIG_FABLE_ETH=y by itself.
+# The board MAC is the native "legend,eth" descriptor-ring device.  Its driver
+# is out of tree for now: build-kernel.sh applies patches/legend-eth.patch when
+# that file exists and then adds CONFIG_LEGEND_ETH=y by itself.
 CONFIG_VIRTIO_NET=y
 # CONFIG_WLAN is not set
 

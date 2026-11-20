@@ -5,7 +5,7 @@
 cd "$(dirname "$0")/.."
 mkdir -p build/isatr
 one() { h=$1; t=$(basename $h .hex); a="+hex=$h +tohost=$(cat ${h%.hex}.tohost) +quiet +max_cycles=2000000"
-  ./build/sim/fable64 $a +trace=build/isatr/$t.a >/dev/null; ./build/sim/fable64 $a +jitter +trace=build/isatr/$t.b >/dev/null
+  ./build/sim/legend64 $a +trace=build/isatr/$t.a >/dev/null; ./build/sim/legend64 $a +jitter +trace=build/isatr/$t.b >/dev/null
   n=$(( $(wc -l < build/isatr/$t.a) < $(wc -l < build/isatr/$t.b) ? $(wc -l < build/isatr/$t.a) : $(wc -l < build/isatr/$t.b) ))
   d=$(( $(wc -l < build/isatr/$t.a) - $(wc -l < build/isatr/$t.b) )); d=${d#-}
   if [ $d -le 6 ] && cmp -s <(head -n $n build/isatr/$t.a) <(head -n $n build/isatr/$t.b); then echo SAME; else echo "DIFF $t"; fi

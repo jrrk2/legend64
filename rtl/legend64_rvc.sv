@@ -1,6 +1,6 @@
-// fable64_rvc: expands a 16-bit RV64C instruction into its 32-bit equivalent.
+// legend64_rvc: expands a 16-bit RV64C instruction into its 32-bit equivalent.
 // Reserved and illegal encodings set `illegal`; the caller then traps with the 16 raw bits.
-module fable64_rvc (
+module legend64_rvc (
     input  logic [15:0] c,
     output logic [31:0] x,
     output logic        illegal
