@@ -1,0 +1,128 @@
+// SPDX-License-Identifier: (GPL-2.0-only OR MIT)
+/*
+ * fable64 on the Xilinx VC707 - one RV64GC hart, Sv39, 1 GiB RAM.
+ * The memory map mirrors QEMU's "virt" machine for CLINT, PLIC and UART.
+ *
+ * This file goes through the C preprocessor (see build-dtb.sh):
+ *   TIMEBASE_HZ   mtime tick rate = CPU clock (the one value to change if the
+ *                 clock rises), default 25 MHz
+ *   BOOTARGS      kernel command line, default = NFS root
+ *   INITRD_START / INITRD_END   when defined, describe a preloaded initramfs
+ */
+#ifndef TIMEBASE_HZ
+#define TIMEBASE_HZ 25000000
+#endif
+#ifndef BOOTARGS
+#define BOOTARGS "console=ttyS0,115200 earlycon root=/dev/nfs nfsroot=192.168.1.176:/srv/nfs/fable64,vers=3,tcp,rsize=32768,wsize=32768 rw ip=192.168.1.51::192.168.1.1:255.255.255.0:fable64:eth0:off"
+#endif
+
+/dts-v1/;
+
+/ {
+	#address-cells = <2>;
+	#size-cells = <2>;
+	compatible = "fable,fable64-vc707", "fable,fable64";
+	model = "fable64 RV64GC on Xilinx VC707";
+
+	aliases {
+		serial0 = &uart0;
+		ethernet0 = &eth0;
+	};
+
+	chosen {
+		bootargs = BOOTARGS;
+		stdout-path = "serial0:115200n8";
+#ifdef INITRD_START
+		linux,initrd-start = <0x0 INITRD_START>;
+		linux,initrd-end = <0x0 INITRD_END>;
+#endif
+	};
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		timebase-frequency = <TIMEBASE_HZ>;
+
+		cpu0: cpu@0 {
+			device_type = "cpu";
+			compatible = "fable,fable64", "riscv";
+			reg = <0>;
+			status = "okay";
+			/* No Zicntr (no time CSR), Zihpm, Sstc, Zb*, V, Zicbo*, PMP. */
+			riscv,isa = "rv64imafdc_zicsr_zifencei";
+			riscv,isa-base = "rv64i";
+			riscv,isa-extensions = "i", "m", "a", "f", "d", "c",
+					       "zicsr", "zifencei";
+			mmu-type = "riscv,sv39";
+			clock-frequency = <TIMEBASE_HZ>;
+
+			cpu0_intc: interrupt-controller {
+				compatible = "riscv,cpu-intc";
+				#interrupt-cells = <1>;
+				interrupt-controller;
+			};
+		};
+	};
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x0 0x80000000 0x0 0x40000000>;	/* 1 GiB */
+	};
+
+	soc {
+		compatible = "simple-bus";
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+		/* Bus-mastering devices see RAM at its CPU physical address
+		 * (identity, no IOMMU).  RISC-V devices are DMA-coherent by
+		 * default, which is what the hardware is, so no further
+		 * property is needed. */
+		dma-ranges;
+
+		clint: clint@2000000 {
+			compatible = "sifive,clint0", "riscv,clint0";
+			reg = <0x0 0x02000000 0x0 0x10000>;
+			/* M-mode software (3) and timer (7) interrupts */
+			interrupts-extended = <&cpu0_intc 3>, <&cpu0_intc 7>;
+		};
+
+		plic: interrupt-controller@c000000 {
+			compatible = "sifive,plic-1.0.0", "riscv,plic0";
+			reg = <0x0 0x0c000000 0x0 0x4000000>;
+			#address-cells = <0>;
+			#interrupt-cells = <1>;
+			interrupt-controller;
+			/* context 0 = hart0 M-external, context 1 = hart0 S-external */
+			interrupts-extended = <&cpu0_intc 11>, <&cpu0_intc 9>;
+			riscv,ndev = <31>;
+		};
+
+		uart0: serial@10000000 {
+			/* no transmit FIFO: "ns16550a" would make the 8250 driver write 16 bytes per interrupt */
+			compatible = "ns16550";
+			reg = <0x0 0x10000000 0x0 0x100>;
+			reg-shift = <0>;
+			reg-io-width = <1>;
+			interrupt-parent = <&plic>;
+			interrupts = <10>;
+			/* The hardware ignores the divisor latch: always 115200 8N1. */
+			clock-frequency = <1843200>;
+			current-speed = <115200>;
+		};
+
+		/*
+		 * Native descriptor-ring MAC, DMA straight to/from system RAM.
+		 * PLACEHOLDER: the register interface and its Linux driver
+		 * (CONFIG_FABLE_ETH, kernel/patches/fable-eth.patch) are pending;
+		 * until then nothing binds to this node.
+		 */
+		eth0: ethernet@30000000 {
+			compatible = "fable,eth";
+			reg = <0x0 0x30000000 0x0 0x1000>;
+			interrupt-parent = <&plic>;
+			interrupts = <2>;
+			local-mac-address = [02 00 00 fa b1 e5];
+		};
+	};
+};

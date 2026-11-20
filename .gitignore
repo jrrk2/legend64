@@ -1,0 +1,19 @@
+# everything built, downloaded or installed locally
+/build/
+/build25.log
+/ref/
+/tools/*
+!/tools/qemu-rv64
+/linux/dl/
+/linux/kernel/src/
+/linux/kernel/build/
+/linux/out/
+/linux/logs/
+/linux/tools/
+/linux/dts/*.dtb
+/linux/initramfs/root/
+/linux/initramfs/work/
+/linux/nfsroot/rehearsal/
+/fpga/litedram/build/litex.log
+__pycache__/
+*.pyc

@@ -1,0 +1,52 @@
+{
+    "version": 1,
+    "litex": {
+        "git_revision": null,
+        "repositories": {}
+    },
+    "command": {
+        "python": "/home/jonathan/riscv/tools/litex/venv/bin/python3",
+        "argv": [
+            "/home/jonathan/riscv/tools/litex/venv/bin/litedram_gen",
+            "vc707.yml",
+            "--output-dir",
+            "build",
+            "--no-compile-software",
+            "--csr-csv",
+            "build/csr.csv",
+            "--csr-json",
+            "build/csr.json"
+        ],
+        "cwd": "/home/jonathan/riscv/fpga/litedram"
+    },
+    "platform": {
+        "name": "platform",
+        "device": "",
+        "toolchain": "XilinxVivadoToolchain"
+    },
+    "soc": {
+        "build_name": "litedram_core",
+        "sys_clk_freq": 100000000,
+        "cpu_type": null,
+        "cpu_variant": null
+    },
+    "files": {
+        "output_dir": "/home/jonathan/riscv/fpga/litedram/build",
+        "gateware_dir": "/home/jonathan/riscv/fpga/litedram/build/gateware",
+        "software_dir": "/home/jonathan/riscv/fpga/litedram/build/software",
+        "csr_csv": "/home/jonathan/riscv/fpga/litedram/build/csr.csv",
+        "csr_json": "/home/jonathan/riscv/fpga/litedram/build/csr.json",
+        "csr_svd": null,
+        "build_log": "/home/jonathan/riscv/fpga/litedram/build/litex.log",
+        "bitstream": "/home/jonathan/riscv/fpga/litedram/build/gateware/litedram_core.bit",
+        "bios": null,
+        "analyzer_csv": null
+    },
+    "build": {
+        "run": false,
+        "status": "succeeded",
+        "started": "2026-11-19T19:34:44",
+        "finished": "2026-11-19T19:34:45",
+        "duration_s": 0.8
+    }
+}

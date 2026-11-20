@@ -1,0 +1,25 @@
+# LiteDRAM standalone core for the VC707's 1 GiB DDR3 SODIMM (MT8JTF12864HZ), DDR3-800:
+# the same PHY, module and clocking as synthgui's vc707_romlinux_clkctl LiteX design.
+# Generate with fpga/litedram/gen.sh. No CPU inside: the fable64 boot monitor runs the
+# initialisation and levelling through the control (Wishbone) port.
+{
+    "cpu":              "None",
+    "speedgrade":       -2,
+    "memtype":          "DDR3",
+    "cmd_latency":      1,
+    "sdram_module":     "MT8JTF12864",
+    "sdram_module_nb":  8,
+    "sdram_rank_nb":    1,
+    "sdram_phy":        "V7DDRPHY",
+    "rtt_nom":          "60ohm",
+    "rtt_wr":           "60ohm",
+    "ron":              "34ohm",
+    "input_clk_freq":   200e6,
+    "sys_clk_freq":     100e6,
+    "iodelay_clk_freq": 200e6,
+    "cmd_buffer_depth": 16,
+    "user_ports": {
+        # not blocked until init_done: liblitedram tests the memory through this port before it sets that flag
+        "native_0": {"type": "native", "block_until_ready": False}
+    }
+}
