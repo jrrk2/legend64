@@ -25,6 +25,8 @@ ap.add_argument('--synthgui', default=os.path.join(legend, 'third_party', 'synth
 ap.add_argument('--clk-mhz', type=float, default=12.5, help='core clock; 1000/clk must suit the MMCM')
 ap.add_argument('--cache-log2', type=int, default=10)
 ap.add_argument('--tlb', type=int, default=8)
+ap.add_argument('--verilator', help="the mapper binary, if not synthgui's own (see patches/)")
+ap.add_argument('--verilator-root', help='and its VERILATOR_ROOT')
 args = ap.parse_args()
 
 ref_json = os.path.join(args.synthgui, 'projects', 'vc707_romlinux.json')
@@ -38,6 +40,8 @@ sources = [
     '../fpga/rtl/legend_uart16550.sv', '../fpga/rtl/legend_plic.sv', '../fpga/rtl/legend_eth.sv',
     '../fpga/rtl/legend_ram.sv', '../fpga/rtl/legend_cache.sv', '../fpga/rtl/litedram_line_adapter.sv',
     '../fpga/rtl/legend64_soc.sv', '../fpga/rtl/legend_sgmii.sv', '../fpga/rtl/legend64_vc707.sv',
+    '../fpga/rtl/legend_flash.sv',                  # legend_reconfig.sv (ICAPE2) is left out: RECONFIG=0 below
+
     '../build/synthgui/litedram_core_open.v',       # written below
     eth + '/liteeth_sgmii_phy.v', eth + '/eth_mac_1g.sv', eth + '/axis_gmii_rx.sv', '../fpga/third_party/verilog-ethernet/axis_gmii_tx.sv',   # corrected copy: see build.tcl
    
@@ -54,7 +58,7 @@ proj.update({
     'sources': sources,
     'incdirs': ['../fpga/rtl'],
     'defines': ['SYNTHESIS'],
-    'params': "-GLITEDRAM=1 -GSYS_DIV=%.3f -GCLK_HZ=%d -GBUILD_ID=24064 -GCACHE_LINES_LOG2=%d -GTLB_ENTRIES=%d "
+    'params': "-GLITEDRAM=1 -GSYS_DIV=%.3f -GCLK_HZ=%d -GBUILD_ID=24064 -GRECONFIG=0 -GCACHE_LINES_LOG2=%d -GTLB_ENTRIES=%d "
               # the boot monitor image (fpga/sw/Makefile), relative to the work directory, where the steps run
               "-GBOOT_HEX='\"../../fpga/boot.hex\"'"
               % (1000.0 / args.clk_mhz, clk_hz, args.cache_log2, args.tlb),
@@ -74,6 +78,10 @@ for s in ref['steps']:
         continue                      # this design is only ever loaded over JTAG
     steps.append(s)
 proj['steps'] = steps
+if args.verilator:
+    proj['verilator'] = os.path.abspath(args.verilator)
+if args.verilator_root:
+    proj['verilator_root'] = os.path.abspath(args.verilator_root)
 json.dump(proj, open(os.path.join(here, 'legend64_vc707.json'), 'w'), indent=2)
 
 # ---------------------------------------------------------------- the DDR3 core for this flow
@@ -129,10 +137,10 @@ for line in open(ref_xdc):
     elif line.startswith('set_property') and '[current_design]' in line:
         out.append(line)
 
-# the switches, which that project does not use: from this repository's Vivado constraints
+# the switches and the flash, which that project does not use: from this repository's Vivado constraints
 out.append('')
 for line in open(os.path.join(legend, 'fpga', 'legend64_vc707.xdc')):
-    m = re.match(r'set_property -dict \{PACKAGE_PIN (\S+) IOSTANDARD (\S+)\} \[get_ports \{?((GPIO_DIP_SW|GPIO_SW)\[\d+\])\}?\]', line)
+    m = re.match(r'set_property -dict \{PACKAGE_PIN (\S+) IOSTANDARD (\S+)\} \[get_ports \{?((GPIO_DIP_SW|GPIO_SW|bpi_addr|bpi_dq)\[\d+\]|bpi_[a-z]+_n)\}?\]', line)
     if m:
         out.append('set_property LOC %s [get_ports {%s}]' % (m.group(1), m.group(3)))
         out.append('set_property IOSTANDARD %s [get_ports {%s}]' % (m.group(2), m.group(3)))

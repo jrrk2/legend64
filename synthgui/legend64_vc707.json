@@ -73,6 +73,7 @@
     "../fpga/rtl/legend64_soc.sv",
     "../fpga/rtl/legend_sgmii.sv",
     "../fpga/rtl/legend64_vc707.sv",
+    "../fpga/rtl/legend_flash.sv",
     "../build/synthgui/litedram_core_open.v",
     "{root}/projects/vc707_ethmin-src/liteeth_sgmii_phy.v",
     "{root}/projects/vc707_ethmin-src/eth_mac_1g.sv",
@@ -127,5 +128,5 @@
   "xdc": "legend64_vc707_open.xdc",
   "xilinx_stubs": "{root}/xc7/cells_sim.v {root}/xc7/cells_xtra.v",
   "bram_fom_budget": "6100/5400",
-  "params": "-GLITEDRAM=1 -GSYS_DIV=80.000 -GCLK_HZ=12500000 -GBUILD_ID=24064 -GCACHE_LINES_LOG2=10 -GTLB_ENTRIES=8 -GBOOT_HEX='\"../../fpga/boot.hex\"'"
+  "params": "-GLITEDRAM=1 -GSYS_DIV=80.000 -GCLK_HZ=12500000 -GBUILD_ID=24064 -GRECONFIG=0 -GCACHE_LINES_LOG2=10 -GTLB_ENTRIES=8 -GBOOT_HEX='\"../../fpga/boot.hex\"'"
 }

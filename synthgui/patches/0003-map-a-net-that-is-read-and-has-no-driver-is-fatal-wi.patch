@@ -1,7 +1,7 @@
 From 280b00e92743c2199431ae89feef6c75b300bfd5 Mon Sep 17 00:00:00 2001
 From: Dr Jonathan Richard Robert Kimmitt <jonathan@kimmitt.uk>
 Date: Fri, 20 Nov 2026 10:32:49 +0000
-Subject: [PATCH 3/4] map: a net that is read and has no driver is fatal, with
+Subject: [PATCH 3/6] map: a net that is read and has no driver is fatal, with
  a log of them all
 
 The mapper already found floating inputs and printed the first twenty as

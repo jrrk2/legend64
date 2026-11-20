@@ -1,7 +1,7 @@
 From eb60f0e6fb8bf3515f3f0b7013724615b7ff64a0 Mon Sep 17 00:00:00 2001
 From: Dr Jonathan Richard Robert Kimmitt <jonathan@kimmitt.uk>
 Date: Fri, 20 Nov 2026 10:32:49 +0000
-Subject: [PATCH 1/4] struct: an array read all at once is registers, not a
+Subject: [PATCH 1/6] struct: an array read all at once is registers, not a
  memory per element
 
 A one-dimensional unpacked array of up to REGISTER_ARRAY_MAX_BITS that the

@@ -1,7 +1,7 @@
 From 644ac537ee38eab9d626d1222f1bf861e2bda729 Mon Sep 17 00:00:00 2001
 From: Dr Jonathan Richard Robert Kimmitt <jonathan@kimmitt.uk>
 Date: Fri, 20 Nov 2026 09:52:13 +0000
-Subject: [PATCH 2/4] map: byte lanes of a memory wider than one tile merge
+Subject: [PATCH 2/6] map: byte lanes of a memory wider than one tile merge
  four to a block RAM
 
 mergeLanes() put the byte lanes of a memory back into one RAMB36E1 with a
