@@ -31,6 +31,8 @@ ap.add_argument('--max-fanout', type=int, default=32)
 ap.add_argument('--mapper-flags', default='', help='more options for the mapper, e.g. --map-only-abc-script "..."')
 ap.add_argument('--out', default='legend64_vc707', help='name of the project file and of its work directory, for experiments')
 ap.add_argument('--pnr', action='append', default=[], metavar='KEY=VALUE', help='a synthgui place and route option, e.g. tmg_ripup=1 or timing_opt=2,30')
+ap.add_argument('--package', metavar='DIR', help="also write the project with copies of everything it reads, as DIR/<out>.json and "
+                "DIR/<out>-src: a project for synthgui's own projects directory")
 ap.add_argument('--chipdb', help='nextpnr chip database to use instead of its own, e.g. one built with the silicon-calibrated delays')
 ap.add_argument('--verilator', help="the mapper binary, if not synthgui's own (see patches/)")
 ap.add_argument('--verilator-root', help='and its VERILATOR_ROOT')
@@ -197,3 +199,42 @@ sdc = ['# Timing constraints for the mapper (verilator --map-only-sdc) for legen
 open(os.path.join(here, args.out + '_synth.sdc'), 'w').write('\n'.join(sdc))
 print('wrote %s.json and %s_open.xdc (%d constraint lines); ports of the reference left out: %s'
       % (args.out, args.out, len(out), ', '.join(sorted(dropped))))
+
+# ---------------------------------------------------------------- a self-contained copy
+# For synthgui's projects directory: the sources, the DDR3 core, the boot monitor image and the
+# constraints beside the project file, named from {root} as synthgui's own projects are.
+if args.package:
+    import shutil
+    srcname = args.out + '-src'
+    src = os.path.join(args.package, srcname)
+    os.makedirs(src, exist_ok=True)
+    ref_dir = '{root}/projects/' + srcname
+    pk = json.loads(json.dumps(proj))
+    def take(path):
+        if path.startswith('{'):
+            return path                              # one of synthgui's own files
+        shutil.copy(os.path.join(here, path), src)
+        return ref_dir + '/' + os.path.basename(path)
+    pk['sources'] = [take(f) for f in proj['sources']]
+    pk['srcdir'] = ref_dir
+    pk['incdirs'] = [ref_dir]
+    pk['work'] = '~/synthgui-work/' + args.out
+    pk['xdc'] = ref_dir + '/' + args.out + '_open.xdc'
+    shutil.copy(os.path.join(legend, 'build', 'fpga', 'boot.hex'), src)
+    shutil.copy(os.path.join(legend, 'LICENSE'), src)
+    shutil.copy(os.path.join(here, 'PROJECT_README.md'), os.path.join(src, 'README.md'))
+    os.makedirs(os.path.join(src, 'mapper-patches'), exist_ok=True)
+    for f in sorted(os.listdir(os.path.join(here, 'patches'))):
+        if f.endswith('.patch'):
+            shutil.copy(os.path.join(here, 'patches', f), os.path.join(src, 'mapper-patches'))
+    open(os.path.join(src, args.out + '_open.xdc'), 'w').write('\n'.join(out))
+    open(os.path.join(src, args.out + '_synth.sdc'), 'w').write('\n'.join(sdc))
+    params = pk['params'].replace('../../fpga/boot.hex', ref_dir + '/boot.hex') \
+                         .replace('../../../synthgui/', ref_dir + '/')
+    assert '../' not in params, params
+    pk['params'] = params
+    for k in ('verilator', 'verilator_root'):        # synthgui's own mapper: see the README
+        pk[k] = ref[k]
+    assert '/home/' not in json.dumps(pk)
+    json.dump(pk, open(os.path.join(args.package, args.out + '.json'), 'w'), indent=2)
+    print('packaged as %s.json and %s/ in %s' % (args.out, srcname, args.package))
