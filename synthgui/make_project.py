@@ -30,6 +30,8 @@ ap.add_argument('--timing-margin', type=float, help='ns the mapper aims to beat 
 ap.add_argument('--max-fanout', type=int, default=32)
 ap.add_argument('--mapper-flags', default='', help='more options for the mapper, e.g. --map-only-abc-script "..."')
 ap.add_argument('--out', default='legend64_vc707', help='name of the project file and of its work directory, for experiments')
+ap.add_argument('--pnr', action='append', default=[], metavar='KEY=VALUE', help='a synthgui place and route option, e.g. tmg_ripup=1 or timing_opt=2,30')
+ap.add_argument('--chipdb', help='nextpnr chip database to use instead of its own, e.g. one built with the silicon-calibrated delays')
 ap.add_argument('--verilator', help="the mapper binary, if not synthgui's own (see patches/)")
 ap.add_argument('--verilator-root', help='and its VERILATOR_ROOT')
 args = ap.parse_args()
@@ -58,7 +60,7 @@ proj.update({
     'name': 'legend64 RV64GC on the VC707 (LiteDRAM, SGMII)',
     'top': 'legend64_vc707',
     'work': '../build/synthgui/' + args.out,
-    'xdc': 'legend64_vc707_open.xdc',
+    'xdc': args.out + '_open.xdc',
     'srcdir': '../fpga/rtl',
     'sources': sources,
     'incdirs': ['../fpga/rtl'],
@@ -69,7 +71,7 @@ proj.update({
               % (1000.0 / args.clk_mhz, clk_hz, args.cache_log2, args.tlb)
               + ('' if args.timing_passes < 0 else
                  # timing-driven mapping against the clocks in legend64_vc707_synth.sdc (written below)
-                 ' --map-only-sdc ../../../synthgui/legend64_vc707_synth.sdc --map-only-pins ../../../synthgui/legend64_vc707_open.xdc --map-only-timing-report legend64_vc707_timing.rpt'
+                 ' --map-only-sdc ../../../synthgui/%s_synth.sdc --map-only-pins ../../../synthgui/%s_open.xdc --map-only-timing-report legend64_vc707_timing.rpt' % (args.out, args.out) +
                  ' --map-only-timing-iterations %d --map-only-max-fanout %d' % (args.timing_passes, args.max_fanout)
                  + ('' if args.timing_margin is None else ' --map-only-timing-margin %g' % args.timing_margin))
               + (' ' + args.mapper_flags if args.mapper_flags else ''),
@@ -80,6 +82,9 @@ proj.pop('bpi_bridge_dir', None)
 # XDC through synthgui's option: nextpnr wants the generated clocks defined on nets, the mapper
 # on the pins that make them, and neither reads the other's form.
 proj['options'] = {k: v for k, v in ref.get('options', {}).items() if k != 'synth.timing'}
+for kv in args.pnr:
+    k, v = kv.split('=', 1)
+    proj['options']['pnr.' + k] = v
 steps = []
 for s in ref['steps']:
     s = dict(s)
@@ -88,6 +93,8 @@ for s in ref['steps']:
         s['command'] = s['command'].replace('{defines}', '{defines} {params}')
     if s['id'] == 'program_flash':
         continue                      # this design is only ever loaded over JTAG
+    if s['id'] == 'pnr' and args.chipdb:    # synthgui rebuilds {nextpnr_flags} from its options, so not there
+        s['command'] += ' --chipdb ' + os.path.abspath(args.chipdb)
     steps.append(s)
 proj['steps'] = steps
 if args.verilator:
@@ -171,7 +178,7 @@ out += ['',
         'set_clock_groups -group [get_clocks -of [get_nets eth_rx_clk]] -group [get_clocks -of [get_nets clk_sys]] -asynchronous',
         'set_clock_groups -group [get_clocks -of [get_nets clk_sys]] -group [get_clocks -of [get_nets mem_clk]] -asynchronous',
         '']
-open(os.path.join(here, 'legend64_vc707_open.xdc'), 'w').write('\n'.join(out))
+open(os.path.join(here, args.out + '_open.xdc'), 'w').write('\n'.join(out))
 
 # ---------------------------------------------------------------- the mapper's timing constraints
 # Every clock is named where it is made, which also makes each a domain of its own: the mapper
@@ -187,6 +194,6 @@ sdc = ['# Timing constraints for the mapper (verilator --map-only-sdc) for legen
        'create_clock -name eth_txout -period 16.000 [get_pins u_eth_i_phy_GTXE2_CHANNEL/TXOUTCLK]',
        'create_clock -name eth_rxout -period 16.000 [get_pins u_eth_i_phy_GTXE2_CHANNEL/RXOUTCLK]',
        '']
-open(os.path.join(here, 'legend64_vc707_synth.sdc'), 'w').write('\n'.join(sdc))
-print('wrote legend64_vc707.json and legend64_vc707_open.xdc (%d constraint lines); ports of the reference left out: %s'
-      % (len(out), ', '.join(sorted(dropped))))
+open(os.path.join(here, args.out + '_synth.sdc'), 'w').write('\n'.join(sdc))
+print('wrote %s.json and %s_open.xdc (%d constraint lines); ports of the reference left out: %s'
+      % (args.out, args.out, len(out), ', '.join(sorted(dropped))))

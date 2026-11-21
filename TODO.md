@@ -12,14 +12,16 @@ Roughly in priority order within each section. Measurements are from the VC707 a
   reserve kernel with a small root for when the network is away. The read-only JFFS2 reader is
   written and tested on the host (`scripts/test_jffs2.sh`); the monitor does not use it yet and
   the partition is blank.
-- **Open flow at 25 MHz:** with the mapper's timing-driven passes and its own constraint file
-  (`synthgui/legend64_vc707_synth.sdc`) the core clock routes at 27.2 MHz against a 25 MHz
-  target (23.5 MHz before, untargeted); every clock passes. Bitstream
-  `build/synthgui/legend64_vc707_25m_timing.bit`, not yet run on the board (it needs a device
-  tree built with `TIMEBASE_HZ=25000000`). More passes or other ABC scripts do not move it: the
-  routed critical path (instruction register to `m_val`) is 42 LUTs, 33 carry stages and 11
-  wide-function muxes deep, and 73 % of its 36.7 ns is routing. The mapper's estimate also
-  charges 0.15 ns of net delay per carry-chain link, which a routed chain does not have.
+- **Open flow, how fast:** it runs on the board at 25 MHz (below). The routed critical path
+  (instruction register to `m_val`) is 42 LUTs, 33 carry stages and 11 wide-function muxes deep
+  and mostly routing; more mapper passes or other ABC scripts did not move the mapper's own
+  estimate, which also charges 0.15 ns of net delay per carry-chain link that a routed chain does
+  not have. Not yet tried at a higher target with the router's timing rip-up
+  (`make_project.py --pnr tmg_ripup=1`), post-placement timing optimisation, or whole-program
+  mapping.
+- **lvs_equiv as the mapper's regression check:** compare a plain mapping of the SoC with the
+  timing-driven one (`lvs_equiv --pair-memories`); the simulation in `synthgui/compare.sh` only
+  covers what the boot code exercises.
 - **Timing margin:** the build with the flash bridge closes at +0.056 ns.
 
 ## Done recently
@@ -29,6 +31,12 @@ Roughly in priority order within each section. Measurements are from the VC707 a
   `win_data[16*buf_cnt +: 32] = arr_word`), found by running RTL and netlist side by side
   (`synthgui/netlist_compare.py`); fixed in `synthgui/patches/0005`, initial contents in `0006`.
   The open-flow bitstream now brings the monitor up on the board at 12.5 MHz.
+- Open flow at 25 MHz on the board (Debian from NFS, both flash partitions seen): timing-driven
+  mapping with its own constraint file (`synthgui/legend64_vc707_synth.sdc`) and nextpnr with the
+  silicon-calibrated database (`make_project.py --chipdb`), core clock 31.6 MHz routed. The
+  first such bitstreams were dead with clock and link alive: the mapper's fanout limit gave
+  flip-flops that reset on `!core_rst_n` a non-inverted copy of the register. Fixed in
+  `synthgui/patches/0008`. Linux there needs a device tree with `TIMEBASE_HZ=25000000`.
 - Boot with no host script: the monitor fetches firmware, kernel and device tree by TFTP
   (tftpd-hpa on the host, `/srv/tftp/legend64/`); the flash holds such a build, so power-on goes
   to a Debian login by itself.
