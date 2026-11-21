@@ -22,8 +22,8 @@ for kind, par, name, body in re.findall(r'\b(FD[RSCP]E)\s+#\(([^;]*?)\)\s+(\S+)\
     if clk != '\\u_boot.clk':
         continue                                  # the system clock only: one sample point
     rtl = re.sub(r'__(\d+)', r'[\1]', q.lstrip('\\'))   # arr__3[5] is arr[3][5]
-    if rtl.endswith('_n') or 'wire_' in rtl:
-        continue                                  # the mapper's own registers
+    if rtl.endswith('_n') or 'wire_' in rtl or re.search(r'_[bf]ret\d+', rtl):
+        continue                                  # the mapper's own registers, retimed ones among them
     checks.append('    if (u_ref.%s !== u_map.%s ) bad("%s", u_ref.%s, u_map.%s );' % (rtl, q, rtl, rtl, q))
 
 ports = '''.clk, .rst, .ddr_ready(1'b1), .ddr_soft(1'b0),

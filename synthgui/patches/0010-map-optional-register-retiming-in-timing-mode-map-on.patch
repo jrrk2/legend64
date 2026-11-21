@@ -1,7 +1,7 @@
-From 6f4e68dd5b1b9866bc159da2b8e761f4ca27dbfe Mon Sep 17 00:00:00 2001
+From 862b0e9db66392df77e8ca6b79e84003450d6083 Mon Sep 17 00:00:00 2001
 From: Dr Jonathan Richard Robert Kimmitt <jonathan@kimmitt.uk>
 Date: Sat, 21 Nov 2026 14:24:04 +0000
-Subject: [PATCH 10/10] map: optional register retiming in timing mode
+Subject: [PATCH] map: optional register retiming in timing mode
  (--map-only-retime <rounds>)
 
 After the best timing-driven pass is chosen, each round moves logic across flip-flops from
@@ -26,13 +26,13 @@ it as it copies any LUT.
 --map-only-retime-forward / -backward restrict the rounds to one direction;
 --map-only-retime-keep keeps every round, for testing the moves themselves.
 ---
- src/V3EmitMap.cpp | 535 +++++++++++++++++++++++++++++++++++++++++++++-
+ src/V3EmitMap.cpp | 536 +++++++++++++++++++++++++++++++++++++++++++++-
  src/V3Options.cpp |   5 +
  src/V3Options.h   |   8 +
- 3 files changed, 539 insertions(+), 9 deletions(-)
+ 3 files changed, 540 insertions(+), 9 deletions(-)
 
 diff --git a/src/V3EmitMap.cpp b/src/V3EmitMap.cpp
-index 60a703f..001ba65 100644
+index 60a703f..7721a9c 100644
 --- a/src/V3EmitMap.cpp
 +++ b/src/V3EmitMap.cpp
 @@ -1153,7 +1153,8 @@ public:
@@ -45,7 +45,7 @@ index 60a703f..001ba65 100644
              // abc's netlist as read, before the emission reworks it (register
              // polarity, fanout copies): what a re-emission of this pass starts from
              const std::map<std::string, Lut> lutsRead
-@@ -1187,13 +1188,93 @@ public:
+@@ -1187,13 +1188,94 @@ public:
                  }
              }
          }
@@ -122,8 +122,9 @@ index 60a703f..001ba65 100644
 +                        m_rtSet.erase(rb);
 +                        m_rtRejected.insert(rb);
 +                    }
-+                    for (const std::string& n : addedFwd) {  // (this round's are at the end)
-+                        if (!m_ftOrder.empty() && m_ftOrder.back() == n) m_ftOrder.pop_back();
++                    for (const std::string& n : addedFwd) {
++                        m_ftOrder.erase(std::remove(m_ftOrder.begin(), m_ftOrder.end(), n),
++                                        m_ftOrder.end());
 +                        m_ftRejected.insert(n);
 +                    }
 +                    timingNotes.push_back(note.str() + ": not kept");
@@ -146,7 +147,7 @@ index 60a703f..001ba65 100644
          }
          if (timing) {
              for (const std::string& l : timingNotes)
-@@ -1235,6 +1316,14 @@ private:
+@@ -1235,6 +1317,14 @@ private:
          m_regDup.clear();
          m_spread.clear();
          m_dupLuts = m_dupRegs = 0;
@@ -161,7 +162,7 @@ index 60a703f..001ba65 100644
      }
  
      // ---- fanout ----
-@@ -1257,6 +1346,55 @@ private:
+@@ -1257,6 +1347,55 @@ private:
      std::unordered_map<std::string, Spread> m_spread;  // by node
      std::map<std::pair<size_t, size_t>, std::vector<std::string>>
          m_regDup;  // (register, bit) -> copies' BLIF names
@@ -217,7 +218,7 @@ index 60a703f..001ba65 100644
      int m_dupLuts = 0;
      int m_dupRegs = 0;
      struct Lut;  // abc's LUT (BLIF back, below)
-@@ -1299,6 +1437,278 @@ private:
+@@ -1299,6 +1438,278 @@ private:
          if (invp) *invp = inv;
          return n;
      }
@@ -496,7 +497,7 @@ index 60a703f..001ba65 100644
      void limitFanout(std::map<std::string, Lut>& luts, std::vector<std::string>& order) {
          const size_t F = v3Global.opt.mapOnlyMaxFanout();
          if (F < 2) return;
-@@ -1315,6 +1725,8 @@ private:
+@@ -1315,6 +1726,8 @@ private:
              for (size_t b = 0; b < r.q.size(); ++b) {
                  const int ql = m_aig.resolve(r.q[b]);
                  if (ql < 2 || (ql & 1)) continue;
@@ -505,7 +506,7 @@ index 60a703f..001ba65 100644
                  regOfVar[ql >> 1] = {ri, b};
              }
          }
-@@ -2880,6 +3292,8 @@ private:
+@@ -2880,6 +3293,8 @@ private:
                  std::cerr << "%Info: map-regs: " << n << " register bits stored inverted, "
                            << m_flipGain << " inverter LUTs removed\n";
          }
@@ -514,7 +515,7 @@ index 60a703f..001ba65 100644
          limitFanout(luts, order);
          // 1. nets for PIs (sources) and for every LUT output; resolve BLIF names
          std::unordered_map<std::string, std::string> netOfName;  // blif name -> net json
-@@ -2891,6 +3305,12 @@ private:
+@@ -2891,6 +3306,12 @@ private:
          }
          for (const auto& kv : m_regDup)
              for (const std::string& cp : kv.second) netOfName[cp] = newNet();
@@ -527,7 +528,7 @@ index 60a703f..001ba65 100644
          // The net a register pin reads a PO from: the node's, or one of its
          // fanout copies' (limitFanout) once the first group is full
          const size_t F = std::max<size_t>(1, v3Global.opt.mapOnlyMaxFanout());
-@@ -2967,6 +3387,22 @@ private:
+@@ -2967,6 +3388,22 @@ private:
              if (o.size() > 1 && o[0] == 'v' && std::isdigit(static_cast<unsigned char>(o[1])))
                  m_cutNet[o] = netOfName[o];
          }
@@ -550,7 +551,7 @@ index 60a703f..001ba65 100644
          // POs that abc wrote as .names outputs get those nets; others may be
          // direct PI buffers / constants handled by abc as LUT1s anyway
          m_poNet.assign(m_po.size(), "");
-@@ -3066,7 +3502,8 @@ private:
+@@ -3066,7 +3503,8 @@ private:
              const auto soleLut = [&](const std::string& n) {
                  const auto it = luts.find(n);
                  return it != luts.end() && !skip.count(n) && !it->second.ins.empty()
@@ -560,7 +561,7 @@ index 60a703f..001ba65 100644
              };
              std::set<std::string> f7;
              std::set<std::string> f7data;  // LUTs feeding a MUXF7: they stay LUTs
-@@ -3349,6 +3786,52 @@ private:
+@@ -3349,6 +3787,52 @@ private:
                          attrs.emplace_back("MERGED_EQUIV", "\"" + names + "\"");
                      }
                  }
@@ -613,7 +614,7 @@ index 60a703f..001ba65 100644
                  cell(type, sanitize(r.name) + "_" + std::to_string(bn),
                       {{"INIT", initv ? "\"1\"" : "\"0\""}}, ins, {{"Q", "[" + q + "]"}}, attrs);
                  // its copies for fanout (limitFanout): the same register again
-@@ -3365,6 +3848,40 @@ private:
+@@ -3365,6 +3849,40 @@ private:
                  }
              }
          }
