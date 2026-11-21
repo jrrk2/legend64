@@ -1,8 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Place and route a netlist from synthgui's mapper with Vivado, to tell a fault in the mapping
 # from one in the open place-and-route and bitstream tools: the same netlist, the same pins.
-#   vivado -mode batch -source vivado_netlist.tcl -tclargs <netlist.edf> <open-flow xdc> <out dir> <core clock period ns>
-lassign $argv edf xdc out period
+#   vivado -mode batch -source vivado_netlist.tcl -tclargs <netlist.edf> <open-flow xdc> <out dir> <core clock period ns> [explore|plain]
+# The core clock's period is the netlist's own (its MMCM); `explore` runs the stages with the
+# directives of the Vivado build of the RTL (fpga/scripts/build.tcl), to see how fast the
+# mapper's netlist can go when Vivado tries as hard as it does there; `plain` places and routes
+# and does nothing else, which measures the netlist itself.
+lassign $argv edf xdc out period effort
 file mkdir $out
 set_part xc7vx485tffg1761-2
 read_edif $edf
@@ -43,11 +47,29 @@ set_false_path -to [get_ports {LED[*] UART_TX eth_rst_n}]
 set_false_path -from [get_ports {GPIO_DIP_SW[*] GPIO_SW[*] UART_RX sys_rst}]
 puts "core clocks: $core_clks"
 
-opt_design
-place_design
-phys_opt_design
-route_design
+if {$effort eq "explore"} {
+    opt_design -directive Explore
+    place_design -directive ExtraTimingOpt
+    phys_opt_design -directive AggressiveExplore
+    route_design -directive Explore
+    phys_opt_design -directive AggressiveExplore
+} elseif {$effort eq "plain"} {
+    # place and route alone: the netlist as the mapper wrote it, with no logic optimisation,
+    # replication or retiming by Vivado
+    place_design
+    route_design
+} else {
+    opt_design
+    place_design
+    phys_opt_design
+    route_design
+}
+write_checkpoint -force $out/route.dcp
 report_timing_summary -file $out/timing.rpt -max_paths 5
+foreach c $core_clks {
+    set p [get_timing_paths -quiet -setup -group $c -max_paths 1]
+    if {$p ne {}} { puts "RESULT clock $c period [get_property PERIOD $c] slack [get_property SLACK $p] levels [get_property LOGIC_LEVELS $p] from [get_property STARTPOINT_PIN $p] to [get_property ENDPOINT_PIN $p]" }
+}
 report_utilization -file $out/util.rpt
 report_drc -file $out/drc.rpt
 puts "RESULT WNS=[get_property SLACK [get_timing_paths -max_paths 1 -setup]] WHS=[get_property SLACK [get_timing_paths -max_paths 1 -hold]]"

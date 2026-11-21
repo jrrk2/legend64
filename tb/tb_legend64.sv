@@ -4,6 +4,8 @@
 // timer (msip 0x0200_0000, mtimecmp 0x0200_4000, mtime 0x0200_bff8).
 //
 // +jitter randomises grant and read latency on both ports to exercise the bus handshakes.
+// +ilat=<n> / +dlat=<n> add n cycles to every instruction / load answer (0..2): what a register
+// in the memory's answer path would cost in cycles.
 `timescale 1ns / 1ps
 
 module tb;
@@ -36,6 +38,7 @@ module tb;
   logic [63:0] memory[1 << AW];
   longint cycles = 0, retired = 0, max_cycles = 500_000_000;
   bit jitter, quiet;
+  int ilat = 0, dlat = 0;
   int trace_fd = 0;
   string hex, trace_file;
   logic [63:0] tohost_addr = 64'h8000_1000;
@@ -79,6 +82,8 @@ module tb;
     if (!$value$plusargs("hex=%s", hex)) $fatal(1, "need +hex=<file>");
     $readmemh(hex, memory);
     jitter = $test$plusargs("jitter");
+    void'($value$plusargs("ilat=%d", ilat));
+    void'($value$plusargs("dlat=%d", dlat));
     quiet  = $test$plusargs("quiet");
     void'($value$plusargs("max_cycles=%d", max_cycles));
     void'($value$plusargs("tohost=%h", tohost_addr));
@@ -109,7 +114,7 @@ module tb;
       end else i_cnt <= i_cnt - 1;
     end
     if (rst_n && imem_req && imem_gnt) begin
-      d = jitter ? $urandom_range(0, 2) : 0;
+      d = jitter ? $urandom_range(0, 2) : ilat;
       if (d == 0) begin
         imem_rvalid <= 1;
         imem_rdata <= imem_addr[2] ? 32'(rd_word(imem_addr) >> 32) : 32'(rd_word(imem_addr));
@@ -128,7 +133,7 @@ module tb;
       if (dmem_we) begin
         wr_word(dmem_addr, dmem_wdata, dmem_be);
       end else begin
-        d = jitter ? $urandom_range(0, 2) : 0;
+        d = jitter ? $urandom_range(0, 2) : dlat;
         if (d == 0) begin
           dmem_rvalid <= 1; dmem_rdata <= rd_word(dmem_addr);
         end else begin

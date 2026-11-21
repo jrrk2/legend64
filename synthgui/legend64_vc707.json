@@ -128,5 +128,5 @@
   "xdc": "legend64_vc707_open.xdc",
   "xilinx_stubs": "{root}/xc7/cells_sim.v {root}/xc7/cells_xtra.v",
   "bram_fom_budget": "6100/5400",
-  "params": "-GLITEDRAM=1 -GSYS_DIV=40.000 -GCLK_HZ=25000000 -GBUILD_ID=24064 -GRECONFIG=0 -GCACHE_LINES_LOG2=10 -GTLB_ENTRIES=8 -GBOOT_HEX='\"../../fpga/boot.hex\"' --map-only-sdc ../../../synthgui/legend64_vc707_synth.sdc --map-only-pins ../../../synthgui/legend64_vc707_open.xdc --map-only-timing-report legend64_vc707_timing.rpt --map-only-timing-iterations 2 --map-only-max-fanout 32"
+  "params": "-GLITEDRAM=1 -GSYS_DIV=40.000 -GCLK_HZ=25000000 -GBUILD_ID=24064 -GRECONFIG=0 -GCACHE_LINES_LOG2=10 -GTLB_ENTRIES=8 -GBOOT_HEX='\"../../fpga/boot.hex\"' --map-only-sdc ../../../synthgui/legend64_vc707_synth.sdc --map-only-pins ../../../synthgui/legend64_vc707_open.xdc --map-only-timing-report legend64_vc707_timing.rpt --map-only-timing-iterations 2 --map-only-max-fanout 32 --map-only-bram-x2-x4"
 }

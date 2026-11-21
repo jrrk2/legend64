@@ -12,16 +12,18 @@ Roughly in priority order within each section. Measurements are from the VC707 a
   reserve kernel with a small root for when the network is away. The read-only JFFS2 reader is
   written and tested on the host (`scripts/test_jffs2.sh`); the monitor does not use it yet and
   the partition is blank.
-- **Open flow, how fast:** it runs on the board at 25 MHz (below). The routed critical path
-  (instruction register to `m_val`) is 42 LUTs, 33 carry stages and 11 wide-function muxes deep
-  and mostly routing; more mapper passes or other ABC scripts did not move the mapper's own
-  estimate, which also charges 0.15 ns of net delay per carry-chain link that a routed chain does
-  not have. Not yet tried at a higher target with the router's timing rip-up
-  (`make_project.py --pnr tmg_ripup=1`), post-placement timing optimisation, or whole-program
-  mapping.
-- **lvs_equiv as the mapper's regression check:** compare a plain mapping of the SoC with the
-  timing-driven one (`lvs_equiv --pair-memories`); the simulation in `synthgui/compare.sh` only
-  covers what the boot code exercises.
+- **A register in the cache hit loop.** Vivado's own build closes 50 MHz with +0.13 ns, and its
+  worst paths are cache tag RAM -> hit -> core -> next address -> cache data RAM address in one
+  cycle. One more cycle on load answers costs 12 % of CoreMark's throughput, on instruction
+  answers 45 % with today's fetch (`tb_legend64 +dlat=1 / +ilat=1`); the instruction side needs
+  a fetch stage that runs ahead before it is worth cutting.
+- **Hold in the open flow.** Vivado's timing of the open-flow routes (json2dcp, below) finds
+  about 40 hold violations nextpnr does not: 30 in the Ethernet PHY between its 62.5 and 125 MHz
+  clocks (given to nextpnr as unrelated, so never checked), the rest a few hundredths of a
+  nanosecond. nextpnr's hold fix also buffers only one of the two physical inputs of a
+  one-bit-wide RAMB36's DIADI[0].
+- **lvs_equiv between two syntheses** (`--pair-memories`) ran four hours on the SoC without
+  output; the simulation in `synthgui/compare.sh` is what checks the mapper for now.
 - **Timing margin:** the build with the flash bridge closes at +0.056 ns.
 
 ## Done recently
@@ -37,6 +39,20 @@ Roughly in priority order within each section. Measurements are from the VC707 a
   first such bitstreams were dead with clock and link alive: the mapper's fanout limit gave
   flip-flops that reset on `!core_rst_n` a non-inverted copy of the register. Fixed in
   `synthgui/patches/0008`. Linux there needs a device tree with `TIMEBASE_HZ=25000000`.
+- Open flow at 33.3 MHz on the board, and what it is worth: the FPU now works from captured
+  operands one wide operation a cycle, the PLIC picks by a tree, the boot memory's instruction
+  port is registered with a wait state, and deep memories use x2/x4 block RAMs (mapper patch
+  0009, proven through nextpnr on the board). nextpnr with the calibrated database: 38.6-40.5
+  MHz (typical); Vivado's slow corner on the same routes: 27-29 MHz; calibrated = 0.709 x Vivado
+  slow (`synthgui/timing_fit.py`). The mapper's netlist placed and routed by Vivado alone
+  (`synthgui/vivado_netlist.tcl ... plain`) closes 40 MHz with +1.0 ns: the gap is placement
+  and routing, not synthesis.
+- Timing tools: `synthgui/timing_correlate.py` (mapper estimate against routed, per endpoint),
+  json_drc-portable's `tools/` (a nextpnr route as a Vivado checkpoint, branch
+  `himbaechel-vivado-timing`), `synthgui/vivado_endpoints.tcl`, `synthgui/timing_fit.py`.
+- Mapper patch 0010: optional register retiming (`--map-only-retime`), both directions; correct
+  in simulation, no gain on this design (the late paths start at the instruction register,
+  whose first LUT level also reads registers with other enables).
 - Boot with no host script: the monitor fetches firmware, kernel and device tree by TFTP
   (tftpd-hpa on the host, `/srv/tftp/legend64/`); the flash holds such a build, so power-on goes
   to a Debian login by itself.

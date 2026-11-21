@@ -28,6 +28,8 @@ ap.add_argument('--tlb', type=int, default=8)
 ap.add_argument('--timing-passes', type=int, default=2, help='timing-driven mapping passes after the first; -1 leaves the mapper\'s timing analysis off')
 ap.add_argument('--timing-margin', type=float, help='ns the mapper aims to beat each constraint by (its default: a fifth of the period)')
 ap.add_argument('--max-fanout', type=int, default=32)
+ap.add_argument('--no-bram-x2x4', action='store_true', help='keep deep memories in x1 block RAMs (the mapper before patch 0009)')
+ap.add_argument('--retime', type=int, default=0, help="rounds of the mapper's register retiming (patch 0010); 0 for none")
 ap.add_argument('--mapper-flags', default='', help='more options for the mapper, e.g. --map-only-abc-script "..."')
 ap.add_argument('--out', default='legend64_vc707', help='name of the project file and of its work directory, for experiments')
 ap.add_argument('--pnr', action='append', default=[], metavar='KEY=VALUE', help='a synthgui place and route option, e.g. tmg_ripup=1 or timing_opt=2,30')
@@ -76,6 +78,8 @@ proj.update({
                  ' --map-only-sdc ../../../synthgui/%s_synth.sdc --map-only-pins ../../../synthgui/%s_open.xdc --map-only-timing-report legend64_vc707_timing.rpt' % (args.out, args.out) +
                  ' --map-only-timing-iterations %d --map-only-max-fanout %d' % (args.timing_passes, args.max_fanout)
                  + ('' if args.timing_margin is None else ' --map-only-timing-margin %g' % args.timing_margin))
+              + ('' if args.no_bram_x2x4 else ' --map-only-bram-x2-x4')
+              + (' --map-only-retime %d' % args.retime if args.retime > 0 else '')
               + (' ' + args.mapper_flags if args.mapper_flags else ''),
     'blackboxes': sorted(set(ref['blackboxes']) | {'MMCME2_BASE', 'PLLE2_ADV'}),
 })
