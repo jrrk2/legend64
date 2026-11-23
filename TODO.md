@@ -4,9 +4,6 @@ Roughly in priority order within each section. Measurements are from the VC707 a
 
 ## In progress
 
-- **A kernel oops seen once on the board:** the trap handler entered a second time while still on
-  user registers (`handle_exception+0x8c`, in `systemd-sysctl`). Looks like a rare fault in the
-  core's trap or interrupt entry. Not reproduced, not investigated.
 - **Reserve boot and settings in flash:** a JFFS2 filesystem in the flash's `reserve` partition
   (12 MiB) holding a settings file (MAC address, IP address, TFTP server, boot order) and a
   reserve kernel with a small root for when the network is away. The read-only JFFS2 reader is
@@ -28,6 +25,13 @@ Roughly in priority order within each section. Measurements are from the VC707 a
 
 ## Done recently
 
+- The rare kernel oops at `handle_exception+0x8c` (the trap handler entered again while still on
+  user registers; on 2026-11-23 it killed a process early in boot and systemd fell to the
+  emergency shell). A page walk for a load or store went on after an interrupt had taken its
+  instruction away; when it ended at a page that is not there, the failure was kept and became
+  a page fault of the trap handler's first store. Needs an interrupt in the first cycles of a
+  walk that is slow (page table not in the cache) and fails (demand paging). Fixed in the core;
+  `scripts/trapstress_legend64.sh` reproduces it in thousands of cycles without the fix.
 - synthgui's open flow: the silent bitstream was the mapper dropping a part-select write at an
   offset that is not a multiple of its width (the fetch buffer's
   `win_data[16*buf_cnt +: 32] = arr_word`), found by running RTL and netlist side by side

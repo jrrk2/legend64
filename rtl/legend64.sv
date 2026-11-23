@@ -1045,7 +1045,9 @@ module legend64 #(
         P_CHK: begin
           if (pte_fault) begin
             ptw_state <= P_IDLE;
-            if (!ptw_for_i) d_ptw_fault <= 1'b1;
+            if (!ptw_for_i) begin
+              if (!ptw_kill) d_ptw_fault <= 1'b1;
+            end
             else if (!ptw_kill && !any_redirect) begin iptw_fault <= 1'b1; iptw_fault_vpn <= ptw_vpn; end
           end else if (pte_leaf) begin
             ptw_state <= P_IDLE;
@@ -1058,6 +1060,11 @@ module legend64 #(
         default: ptw_state <= P_IDLE;
       endcase
       if (any_redirect && ptw_busy && ptw_for_i) ptw_kill <= 1'b1;
+      // A walk for data belongs to the instruction in X. If a trap takes that instruction away
+      // (an interrupt: nothing else can while it waits for the walk), the walk's failure is not
+      // the next instruction's: without this, it became a page fault of the first load or store
+      // of the trap handler.
+      if (x_trap && ptw_busy && !ptw_for_i) ptw_kill <= 1'b1;
       if (tlb_flush && ptw_busy) ptw_stale <= 1'b1;
       if (d_fault_now) d_ptw_fault <= 1'b1;
       if (x_done || x_trap) d_ptw_fault <= 1'b0;

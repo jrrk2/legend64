@@ -33,7 +33,7 @@ $(OUT)/isa/$(1)-v-%.elf: $(RT)/isa/$(1)/%.S
 endef
 $(foreach s,$(VSUITES),$(eval $(call VSUITE_RULE,$(s))))
 
-all: isa bench
+all: isa bench stress
 bench: $(OUT)/dhrystone.hex $(OUT)/coremark.hex
 
 $(OUT)/dhrystone.elf: $(wildcard ../dhrystone/*.c) $(COMMON)
@@ -46,6 +46,13 @@ $(OUT)/coremark.elf: $(wildcard ../coremark/*.c) $(COMMON)
 	  -DFLAGS_STR='"$(CM_FLAGS)"' -o $@ $(COMMON) $(wildcard ../coremark/*.c)
 
 isa: $(addprefix $(OUT)/isa/,$(addsuffix .hex,$(ISA)))
+
+# trap entry under interrupts and page faults (scripts/trapstress_legend64.sh)
+.PHONY: stress
+stress: $(OUT)/trapstress.hex
+$(OUT)/trapstress.elf: trapstress.S
+	@mkdir -p $(@D)
+	$(P)gcc $(ARCH) -static -mcmodel=medany -nostdlib -nostartfiles -T link.ld -Wl,--no-warn-rwx-segments -o $@ $<
 
 define SUITE_RULE
 $(OUT)/isa/$(1)-%.elf: $(RT)/isa/$(1)/%.S

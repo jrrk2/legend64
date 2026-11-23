@@ -24,12 +24,16 @@ module tb;
   logic [63:0] tr_cause, tr_epc, tr_tval, pend_cause, pend_epc, pend_tval;
   logic        msip = 0;
   logic [63:0] mtime = 0, mtimecmp = '1;
+  // an external interrupt for the supervisor, raised a chosen number of cycles after a write to
+  // 0x0200_0008 and lowered by the next write (zero: lowered and left so)
+  logic        sext = 0;
+  logic [31:0] sext_cnt = 0;
 
   legend64 uut (
       .clk, .rst_n,
       .imem_req, .imem_addr, .imem_gnt, .imem_rvalid, .imem_rdata,
       .dmem_req, .dmem_we, .dmem_addr, .dmem_wdata, .dmem_be, .dmem_gnt, .dmem_rvalid, .dmem_rdata,
-      .irq_m_ext(1'b0), .irq_m_timer(mtime >= mtimecmp), .irq_m_soft(msip), .irq_s_ext(1'b0), .time_i(mtime),
+      .irq_m_ext(1'b0), .irq_m_timer(mtime >= mtimecmp), .irq_m_soft(msip), .irq_s_ext(sext), .time_i(mtime),
       .tr_valid, .tr_pc, .tr_insn, .tr_wen, .tr_fwen, .tr_rd, .tr_wdata,
       .tr_trap, .tr_trap_late, .tr_cause, .tr_epc, .tr_tval
   );
@@ -69,6 +73,8 @@ module tb;
       if (!quiet && be[0]) $write("%c", data[7:0]);
     end else if (addr[63:3] == 61'h0200_4000 >> 3) begin
       mtimecmp <= data;
+    end else if (addr[63:3] == 61'h0200_0008 >> 3) begin
+      sext <= 1'b0; sext_cnt <= data[31:0];
     end else if (addr[63:3] == 61'h0200_0000 >> 3) begin
       if (be[0]) msip <= data[0];
     end else if (in_ram(addr)) begin
@@ -103,6 +109,7 @@ module tb;
     int d;
     if (rst_n) cycles <= cycles + 1;
     mtime <= mtime + 1;
+    if (sext_cnt != 0) begin sext_cnt <= sext_cnt - 1; if (sext_cnt == 1) sext <= 1'b1; end
     i_gnt_q <= jitter ? ($urandom_range(0, 3) != 0) : 1'b1;
     d_gnt_q <= jitter ? ($urandom_range(0, 3) != 0) : 1'b1;
 
