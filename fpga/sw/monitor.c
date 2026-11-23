@@ -43,7 +43,13 @@
 #define UART_LSR   REG8(0x10000005)
 #define LEDS       REG32(0x20000000)
 #define STATUS     REG32(0x20000008)
-#define CLOCK_HZ   REG32(0x2000000c)
+#define CLOCK_BUILT REG32(0x2000000c)   // the clock the bitstream was built for
+#define CLOCK_MEAS  REG32(0x20000014)   // the clock as the hardware measures it; 0 until it has
+#define CLOCK_HZ    clock_hz()
+// The core clock in hertz. The hardware times it against the board's reference, so a bitstream
+// reclocked after it was built still gives the right answer; until the first measurement is in
+// (a quarter of a second after reset) it is what the bitstream was built for.
+static inline uint32_t clock_hz(void) { uint32_t m = CLOCK_MEAS; return m ? m : CLOCK_BUILT; }
 #define BUILD_ID   REG32(0x20000010)
 #define RECONFIG   REG32(0x20000018)
 #define FLASH_BASE 0x60000000UL
@@ -383,7 +389,8 @@ static void eth_poll(void) {
 // ---------------------------------------------------------------- monitor
 static void status(void) {
   uint32_t st = STATUS, es = ETH(E_STATUS);
-  puts_("  clock "); putdec(CLOCK_HZ); puts_(" Hz, build "); puthex(BUILD_ID, 8);
+  puts_("  clock "); putdec(CLOCK_HZ); puts_(CLOCK_MEAS ? " Hz measured (built for " : " Hz (built for ");
+  putdec(CLOCK_BUILT); puts_("), build "); puthex(BUILD_ID, 8);
   puts_(", DDR3 "); puts_((st >> 16) & 1 ? "calibrated" : "NOT calibrated");
   puts_("\n  ethernet 02:00:00:fa:b1:e5 192.168.1.51, link "); puts_(es & 1 ? "up" : "down");
   puts_(", pcs 0x"); puthex(es >> 16, 4);
@@ -401,7 +408,41 @@ static void serial_load(void) {
   puts_("loaded "); putdec(len); puts_(sum == want ? " bytes, sum OK\n" : " bytes, SUM MISMATCH\n");
 }
 
+// A device tree handed to the next stage is given this machine's clock: the timebase and the
+// CPU's clock frequency, the properties of /cpus and of its children, are overwritten in place
+// with the measured clock. So one device tree serves a bitstream at any clock.
+static uint32_t be32(const uint8_t *p) { return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | p[3]; }
+static int name_is(const uint8_t *p, const char *s) { while (*s) if (*p++ != (uint8_t)*s++) return 0; return *p == 0; }
+static void fdt_set_clock(uint64_t addr, uint32_t hz) {
+  uint8_t *fdt = (uint8_t *)addr;
+  if (addr < DDR_BASE || (addr & 3) || be32(fdt) != 0xd00dfeed) return;
+  uint32_t total = be32(fdt + 4), strs = be32(fdt + 12);
+  uint8_t *p = fdt + be32(fdt + 8), *end = fdt + total;
+  int depth = 0, cpus = 0, n = 0;       // cpus: the depth of the /cpus node while inside it
+  while (p + 4 <= end) {
+    uint32_t tok = be32(p); p += 4;
+    if (tok == 1) {                                        // a node begins: its name, padded
+      depth++;
+      if (depth == 2 && name_is(p, "cpus")) cpus = depth;
+      while (p < end && *p) p++;
+      p = (uint8_t *)(((uint64_t)p + 4) & ~3UL);
+    } else if (tok == 2) {                                 // a node ends
+      if (depth == cpus) cpus = 0;
+      depth--;
+    } else if (tok == 3) {                                 // a property: length, name, value
+      uint32_t len = be32(p); const uint8_t *nm = fdt + strs + be32(p + 4);
+      p += 8;
+      if (cpus && len == 4 && (name_is(nm, "timebase-frequency") || name_is(nm, "clock-frequency"))) {
+        p[0] = hz >> 24; p[1] = hz >> 16; p[2] = hz >> 8; p[3] = hz; n++;
+      }
+      p += (len + 3) & ~3u;
+    } else if (tok != 4) break;                            // the end, or not a device tree
+  }
+  puts_("device tree: clock "); putdec(hz); puts_(" Hz in "); putdec(n); puts_(" properties\n");
+}
+
 static void boot(void (*entry)(uint64_t, uint64_t), uint64_t arg) {
+  fdt_set_clock(arg, CLOCK_HZ);
   puts_("\njumping to 0x"); puthex((uint64_t)entry, 10); puts_(" a1=0x"); puthex(arg, 10); putch('\n');
   eth_stop();                                  // no DMA into memory the next stage owns
   while (!(UART_LSR & 0x40)) ;                 // let the last character out

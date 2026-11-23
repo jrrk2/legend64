@@ -7,6 +7,44 @@
 //
 // The SGMII PHY/PCS and the byte-stream MAC (LiteEth's PHY, eth_mac_1g and what they use) come
 // from synthgui's vc707_ethmin project, unmodified; legend_sgmii joins them.
+// legend_freq: the frequency of clk in hertz, measured against a reference clock of known
+// frequency: a gate that turns over every eighth of a second of the reference is counted in clk.
+// The result reads zero until the first whole gate has passed, and is good to +-8 Hz. Software
+// reads it (the SoC's register 0x2000_0014), so nothing has to be told what the core clock is:
+// a bitstream whose MMCM is reprogrammed still reports, and gives Linux, its true clock.
+module legend_freq #(
+    parameter int unsigned REF_HZ = 100_000_000
+) (
+    input  wire        ref_clk,
+    input  wire        ref_rst,
+    input  wire        clk,
+    input  wire        rst,
+    output reg  [31:0] hz
+);
+  reg [27:0] r_cnt;
+  reg        gate;
+  always @(posedge ref_clk) begin
+    if (ref_rst) begin
+      r_cnt <= 28'd0; gate <= 1'b0;
+    end else if (r_cnt == REF_HZ / 8 - 1) begin
+      r_cnt <= 28'd0; gate <= !gate;
+    end else r_cnt <= r_cnt + 28'd1;
+  end
+  (* ASYNC_REG = "TRUE" *) reg [2:0] g_s;
+  reg [28:0] cnt;
+  reg        seen;
+  always @(posedge clk) begin
+    g_s <= {g_s[1:0], gate};
+    if (rst) begin
+      g_s <= 3'b000; cnt <= 29'd0; seen <= 1'b0; hz <= 32'd0;
+    end else if (g_s[2] != g_s[1]) begin
+      if (seen) hz <= {cnt, 3'b000};
+      seen <= 1'b1;
+      cnt  <= 29'd1;
+    end else cnt <= cnt + 29'd1;
+  end
+endmodule
+
 module legend64_vc707 #(
     parameter real         SYS_DIV  = 20.0,
     parameter bit          LITEDRAM = 1'b0,    // 0: Xilinx memory interface, 1: LiteDRAM
@@ -190,9 +228,15 @@ module legend64_vc707 #(
   wire [7:0]  soc_led;
   wire [15:0] fl_dq_i, fl_dq_o;
   wire        fl_dq_t, reconfig;
+  // the core clock, measured against the memory controller's clock: the 200 MHz board clock
+  // itself with the Xilinx interface, half of it with LiteDRAM
+  wire [31:0] clk_meas_hz;
+  legend_freq #(.REF_HZ(LITEDRAM ? 100_000_000 : 200_000_000)) u_freq (
+      .ref_clk(mem_clk), .ref_rst(mem_rst), .clk(clk_sys), .rst(rst_sys), .hz(clk_meas_hz));
   legend64_soc #(.CLK_HZ(CLK_HZ), .BUILD_ID(BUILD_ID), .BOOT_HEX(BOOT_HEX),
                 .CACHE_LINES_LOG2(CACHE_LINES_LOG2), .TLB_ENTRIES(TLB_ENTRIES)) u_soc (
       .clk(clk_sys), .rst(rst_sys), .ddr_ready(ddr_ready || LITEDRAM), .ddr_soft(LITEDRAM),
+      .clk_meas_hz,
       .mem_req, .mem_we, .mem_addr, .mem_wdata, .mem_ack, .mem_rdata,
       .dcsr_req, .dcsr_we, .dcsr_addr, .dcsr_wdata, .dcsr_ack, .dcsr_rdata,
       .uart_tx(UART_TX), .uart_rx(UART_RX), .led(soc_led), .dip(GPIO_DIP_SW), .btn(GPIO_SW),

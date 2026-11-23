@@ -29,6 +29,7 @@ module legend64_soc #(
     input  logic         rst,          // synchronous
     input  logic         ddr_ready,    // the core is held in reset until this is set (synchronised by the caller)
     input  logic         ddr_soft,     // static: the memory needs software initialisation
+    input  logic [31:0]  clk_meas_hz,  // this clock's frequency as measured, 0 until known (legend_freq)
 
     output logic         mem_req,
     output logic         mem_we,
@@ -264,7 +265,7 @@ module legend64_soc #(
           32'h1000_0000: mmio_q <= {8{uart_q}};
           32'h2000_0000: mmio_q <= {19'b0, btn, dip, 24'b0, led};
           32'h2000_0008: mmio_q <= {CLK_HZ, 14'b0, ddr_soft, ddr_ready, pcs_status};
-          32'h2000_0010: mmio_q <= {32'b0, BUILD_ID};
+          32'h2000_0010: mmio_q <= {clk_meas_hz, BUILD_ID};
           default:       mmio_q <= '0;
         endcase
       end
