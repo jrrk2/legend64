@@ -157,42 +157,61 @@ module legend64_soc #(
   logic [2:0]  mmio_src;      // 0: mmio_q, 1: PLIC, 2: Ethernet, 3: memory controller, 4: flash
   logic [63:0] fl_q;
 
-  assign mmio_acc = dmem_req && dmem_gnt && d_mmio;
-  assign mmio_wr  = mmio_acc && dmem_we;
-  assign mmio_rd  = mmio_acc && !dmem_we;
-  assign wr32     = dmem_addr[2] ? dmem_wdata[63:32] : dmem_wdata[31:0];
-  assign sel_uart = dmem_addr[31:3]  == 29'h1000_0000 >> 3;
-  assign sel_plic = dmem_addr[31:26] == 6'h03;                 // 0x0c00_0000 .. 0x0fff_ffff
-  assign sel_eth  = dmem_addr[31:12] == 20'h30000;
-  assign sel_dcsr = dmem_addr[31:16] == 16'h4000;
-  assign sel_flash = dmem_addr[31:27] == 5'h0c;                // 0x6000_0000 .. 0x67ff_ffff
+  // The peripherals are behind a register (b_*). The core's request is taken into it in the
+  // cycle it is granted, and the peripheral is accessed from it in the next: the data address
+  // and the write data come late out of the core's execute stage, and nothing here needs them
+  // in that cycle. The memory controller's registers and the flash hold the request in the
+  // bridge until they have finished (b_done); everything else finishes in its one cycle. The
+  // bridge takes the next request in the cycle the one it holds finishes.
+  logic        b_v, b_we, b_done, mmio_gnt;
+  logic [31:0] b_addr;
+  logic [63:0] b_wdata;
+  logic [7:0]  b_be;
+  assign sel_uart = b_addr[31:3]  == 29'h1000_0000 >> 3;
+  assign sel_plic = b_addr[31:26] == 6'h03;                 // 0x0c00_0000 .. 0x0fff_ffff
+  assign sel_eth  = b_addr[31:12] == 20'h30000;
+  assign sel_dcsr = b_addr[31:16] == 16'h4000;
+  assign sel_flash = b_addr[31:27] == 5'h0c;                // 0x6000_0000 .. 0x67ff_ffff
+  assign b_done   = sel_dcsr ? dcsr_gnt : sel_flash ? fl_gnt : 1'b1;
+  assign mmio_gnt = !b_v || b_done;
+  assign mmio_acc = b_v && b_done;
+  assign mmio_wr  = mmio_acc && b_we;
+  assign mmio_rd  = mmio_acc && !b_we;
+  assign wr32     = b_addr[2] ? b_wdata[63:32] : b_wdata[31:0];
+  always_ff @(posedge clk) begin
+    if (!core_rst_n) begin
+      b_v <= 1'b0; b_we <= 1'b0; b_addr <= '0; b_wdata <= '0; b_be <= '0;
+    end else if (dmem_req && d_mmio && mmio_gnt) begin
+      b_v <= 1'b1; b_we <= dmem_we; b_addr <= dmem_addr[31:0]; b_wdata <= dmem_wdata; b_be <= dmem_be;
+    end else if (b_done) b_v <= 1'b0;
+  end
 
   // An access to the memory controller's registers is granted only when its handshake has
   // completed; the core holds the request steady until then.
   (* ASYNC_REG = "TRUE" *) logic [1:0] dcsr_ack_s;
   logic [31:0] dcsr_q;
-  assign dcsr_addr  = dmem_addr[15:2];
-  assign dcsr_we    = dmem_we;
+  assign dcsr_addr  = b_addr[15:2];
+  assign dcsr_we    = b_we;
   assign dcsr_wdata = wr32;
   assign dcsr_gnt   = dcsr_req && dcsr_ack_s[1];
   always_ff @(posedge clk) begin
     dcsr_ack_s <= {dcsr_ack_s[0], dcsr_ack};
     if (!core_rst_n) begin dcsr_req <= 1'b0; dcsr_ack_s <= '0; dcsr_q <= '0; end
     else if (dcsr_gnt) begin dcsr_req <= 1'b0; dcsr_q <= dcsr_rdata; end
-    else if (dmem_req && d_mmio && sel_dcsr && !dcsr_ack_s[1]) dcsr_req <= 1'b1;
+    else if (b_v && sel_dcsr && !dcsr_ack_s[1]) dcsr_req <= 1'b1;
   end
 
   legend_flash #(.CLK_HZ(CLK_HZ)) u_flash (
       .clk, .rst(!core_rst_n),
-      .req(dmem_req && d_mmio && sel_flash && !fl_gnt), .we(dmem_we), .addr(dmem_addr[24:1]),
-      .be(dmem_be), .wdata(dmem_wdata), .gnt(fl_gnt), .rdata(fl_q),
+      .req(b_v && sel_flash && !fl_gnt), .we(b_we), .addr(b_addr[24:1]),
+      .be(b_be), .wdata(b_wdata), .gnt(fl_gnt), .rdata(fl_q),
       .fl_addr, .fl_dq_i, .fl_dq_o, .fl_dq_t, .fl_ce_n, .fl_oe_n, .fl_we_n, .fl_adv_n
   );
 
   legend_uart16550 #(.CLK_HZ(CLK_HZ), .BAUD(BAUD)) u_uart (
       .clk, .rst(!core_rst_n),
-      .sel(mmio_acc && sel_uart), .we(dmem_we), .addr(dmem_addr[2:0]),
-      .wdata(dmem_wdata[{dmem_addr[2:0], 3'b000}+:8]), .rdata(uart_q), .irq(uart_irq),
+      .sel(mmio_acc && sel_uart), .we(b_we), .addr(b_addr[2:0]),
+      .wdata(b_wdata[{b_addr[2:0], 3'b000}+:8]), .rdata(uart_q), .irq(uart_irq),
       .rx(uart_rx), .tx(uart_tx)
   );
 
@@ -204,13 +223,13 @@ module legend64_soc #(
   end
   legend_plic u_plic (
       .clk, .rst(!core_rst_n),
-      .sel(mmio_acc && sel_plic), .we(dmem_we), .addr(dmem_addr[25:0]), .wdata(wr32), .rdata(plic_q),
+      .sel(mmio_acc && sel_plic), .we(b_we), .addr(b_addr[25:0]), .wdata(wr32), .rdata(plic_q),
       .src(plic_src), .irq_m(irq_m_ext), .irq_s(irq_s_ext)
   );
 
   legend_eth u_eth (
       .clk, .rst(!core_rst_n),
-      .reg_sel(mmio_acc && sel_eth), .reg_we(dmem_we), .reg_addr(dmem_addr[7:0]), .reg_wdata(wr32),
+      .reg_sel(mmio_acc && sel_eth), .reg_we(b_we), .reg_addr(b_addr[7:0]), .reg_wdata(wr32),
       .reg_rdata(eth_q), .irq(eth_irq),
       .e_req, .e_we, .e_addr, .e_wdata, .e_be, .e_gnt, .e_rvalid, .e_rdata,
       .mac_clk, .mac_rst, .mac_tx_clk, .mac_tx_rst, .rx_tdata, .rx_tvalid, .rx_tlast, .rx_tuser,
@@ -228,17 +247,17 @@ module legend64_soc #(
       mmio_src <= '0; mmio_q <= '0; reconfig <= 1'b0;
     end else begin
       if (mmio_wr) begin
-        case (dmem_addr[31:0])
+        case (b_addr)
           32'h0200_0000: msip <= wr32[0];
-          32'h0200_4000: mtimecmp <= dmem_wdata;
-          32'h0200_bff8: mtime <= dmem_wdata;
+          32'h0200_4000: mtimecmp <= b_wdata;
+          32'h0200_bff8: mtime <= b_wdata;
           32'h2000_0000: led <= wr32[7:0];
           32'h2000_0018: if (wr32 == 32'h4950_5247) reconfig <= 1'b1;
           default: ;
         endcase
       end
       if (mmio_rd) begin
-        case ({dmem_addr[31:3], 3'b000})
+        case ({b_addr[31:3], 3'b000})
           32'h0200_0000: mmio_q <= {63'b0, msip};
           32'h0200_4000: mmio_q <= mtimecmp;
           32'h0200_bff8: mmio_q <= mtime;
@@ -264,7 +283,7 @@ module legend64_soc #(
   assign imem_rvalid = boot_i_rv || none_i_rv || c_i_rvalid;
   assign imem_rdata  = boot_i_rv ? (boot_i_hi ? boot_iq[63:32] : boot_iq[31:0]) : none_i_rv ? 32'h0 : c_i_rdata;
 
-  assign dmem_gnt    = d_ddr ? c_d_gnt : (d_mmio && sel_dcsr) ? dcsr_gnt : (d_mmio && sel_flash) ? fl_gnt : 1'b1;
+  assign dmem_gnt    = d_ddr ? c_d_gnt : d_mmio ? mmio_gnt : 1'b1;
   assign dmem_rvalid = boot_d_rv || mmio_rv || c_d_rvalid;
   assign dmem_rdata  = boot_d_rv ? boot_dq
                      : mmio_rv ? (mmio_src == 3'd1 ? {2{plic_q}} : mmio_src == 3'd2 ? {2{eth_q}} : mmio_src == 3'd3 ? {2{dcsr_q}}
