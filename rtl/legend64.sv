@@ -548,7 +548,7 @@ module legend64 #(
   legend64_fpu u_fpu (
       .clk, .rst_n,
       .start(fpu_start), .accept(x_done), .insn(ir),
-      .a_raw(fa), .b_raw(fb), .c_raw(fc), .x_in(rs1v), .rm(rm_eff),
+      .a_in(fa), .b_in(fb), .c_in(fc), .x_i(rs1v), .rm(rm_eff),
       .busy(fpu_busy), .done(fpu_done), .result(fpu_result), .flags(fpu_flags)
   );
 

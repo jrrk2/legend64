@@ -2,10 +2,11 @@
 // legend64_fpu: IEEE 754 single and double precision unit for the F and D extensions.
 //
 // Multi-cycle: the core holds the instruction steady from `start` until `done && accept`. The
-// operands are captured, unpacked, in the start cycle, and every later step works from
+// operands are captured as they come in the start cycle, and every later step works from
 // registers, one wide operation to a cycle:
 //
-//   IDLE   capture the unpacked operands
+//   IDLE   capture the operands
+//   UNP    unpack them; the combinational operations below finish here
 //   PREP   FMA: the mantissa product, and how far the addend is to be shifted
 //          divide, square root, conversions: set up; float to integer: the shift
 //   ADD    FMA: the sum or the difference (both differences side by side, one carry chain deep)
@@ -20,8 +21,8 @@
 //
 // fadd, fsub and fmul run through the fused multiply-add datapath (a*1+c, a*b+0), so there is
 // one adder and one rounding path to get right. Compares, sign injection, min/max, classify,
-// moves and the special cases (NaN, infinity, zero) are combinational and finish in the start
-// cycle.
+// moves and the special cases (NaN, infinity, zero) are combinational on the captured operands
+// and finish in the cycle after the start.
 
 module legend64_fpu (
     input  logic        clk,
@@ -29,16 +30,17 @@ module legend64_fpu (
     input  logic        start,    // an FP operation is in the execute stage (level)
     input  logic        accept,   // the core takes the result this cycle
     input  logic [31:0] insn,
-    input  logic [63:0] a_raw,    // f[rs1]
-    input  logic [63:0] b_raw,    // f[rs2]
-    input  logic [63:0] c_raw,    // f[rs3]
-    input  logic [63:0] x_in,     // x[rs1], for integer-to-float and fmv
+    input  logic [63:0] a_in,     // f[rs1]
+    input  logic [63:0] b_in,     // f[rs2]
+    input  logic [63:0] c_in,     // f[rs3]
+    input  logic [63:0] x_i,      // x[rs1], for integer-to-float and fmv
     input  logic [2:0]  rm,       // resolved rounding mode
     output logic        busy,     // a multi-cycle operation is in flight
     output logic        done,
     output logic [63:0] result,
     output logic [4:0]  flags     // {NV, DZ, OF, UF, NX}
 );
+  logic [63:0] a_raw, b_raw, c_raw, x_in;   // the operands, captured in the start cycle
   localparam logic [2:0] RNE = 3'd0, RTZ = 3'd1, RDN = 3'd2, RUP = 3'd3, RMM = 3'd4;
   localparam logic [63:0] QNAN_D = 64'h7ff8_0000_0000_0000;
   localparam logic [63:0] QNAN_S = 64'hffff_ffff_7fc0_0000;
@@ -310,7 +312,7 @@ module legend64_fpu (
                    !A.sign & a_sub, !A.sign & A.zero, A.sign & A.zero, A.sign & a_sub,
                    A.sign & !A.inf & !A.nan & !A.zero & !a_sub, A.sign & A.inf};
 
-  logic comb_op;   // finishes in the start cycle
+  logic comb_op;   // finishes in S_UNP
   // scratch values of the block below, given a value on every path so that none is a latch
   logic cb_s, cb_pick_a, cb_any_nan;
   always_comb begin
@@ -380,7 +382,7 @@ module legend64_fpu (
   end
 
   // ------------------------------------------------------------------ sequenced datapath
-  typedef enum logic [3:0] {S_IDLE, S_PREP, S_ALIGN, S_ADD, S_F2I, S_DIV, S_SQRT, S_NORM, S_ROUND, S_ROUND2, S_DONE} state_e;
+  typedef enum logic [3:0] {S_IDLE, S_UNP, S_PREP, S_ALIGN, S_ADD, S_F2I, S_DIV, S_SQRT, S_NORM, S_ROUND, S_ROUND2, S_DONE} state_e;
   state_e state;
 
   logic [105:0]       prod;
@@ -473,7 +475,7 @@ module legend64_fpu (
 
   always_comb begin
     done = 1'b0; result = '0; flags = '0;
-    if (state == S_IDLE && start && comb_op) begin
+    if (state == S_UNP && comb_op) begin
       done = 1'b1; result = comb_res; flags = comb_fl;
     end else if (state == S_DONE) begin
       done = 1'b1; result = res_q; flags = fl_q;
@@ -490,6 +492,7 @@ module legend64_fpu (
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       state <= S_IDLE;
+      a_raw <= '0; b_raw <= '0; c_raw <= '0; x_in <= '0;
       Aq <= '0; Bq <= '0; Cq <= '0; Asq <= '0; x_q <= '0;
       c_fr_q <= '0; fma_base_q <= '0; p_sign_q <= 1'b0; c_sign_q <= 1'b0; p_zero_q <= 1'b0;
       int_q <= '0; base_q <= '0; sign_q <= 1'b0; zsign_q <= 1'b0;
@@ -499,9 +502,17 @@ module legend64_fpu (
       cnt <= '0; dv_q <= '0; dv_r <= '0; sq_n <= '0; sq_rem <= '0; sq_root <= '0;
     end else begin
       unique case (state)
-        S_IDLE: if (start && !comb_op) begin
-          Aq <= A; Bq <= B; Cq <= C; Asq <= Asrc; x_q <= x_in;
-          state <= S_PREP;
+        S_IDLE: if (start) begin
+          a_raw <= a_in; b_raw <= b_in; c_raw <= c_in; x_in <= x_i;
+          state <= S_UNP;
+        end
+        S_UNP: begin
+          if (comb_op) begin
+            if (accept) state <= S_IDLE;
+          end else begin
+            Aq <= A; Bq <= B; Cq <= C; Asq <= Asrc; x_q <= x_in;
+            state <= S_PREP;
+          end
         end
         S_PREP: begin
           if (is_fma) begin        // the product is registered above

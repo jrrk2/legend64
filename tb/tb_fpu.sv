@@ -11,7 +11,7 @@ module tb;
   logic [2:0]  rm;
   logic [4:0]  flags;
   logic [7:0]  exp_fl;
-  legend64_fpu dut (.clk, .rst_n, .start, .accept(done), .insn, .a_raw(a), .b_raw(b), .c_raw(c), .x_in(x), .rm,
+  legend64_fpu dut (.clk, .rst_n, .start, .accept(done), .insn, .a_in(a), .b_in(b), .c_in(c), .x_i(x), .rm,
                    .busy, .done, .result, .flags);
   int fd, n = 0, bad = 0, rmi;
   string vec;
