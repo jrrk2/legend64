@@ -402,8 +402,20 @@ module legend64 #(
                                             : (dtlb_perm[0] || (mstatus_mxr && dtlb_perm[2])));
   assign d_paddr    = d_xlate ? {8'b0, dtlb_ppn, ea[11:0]} : ea;
 
+  // The data TLB is looked up with the page of the base register, while the adder runs. That is
+  // the page of the address unless the offset carries into it (d_cross: the carry out of the low
+  // twelve bits against the offset's sign). When it does, the instruction spends one more cycle
+  // in X and the lookup is made with the address's own page, kept in ea_page (d_retry).
+  logic        d_cross, d_retry, d_lk_ok;
+  logic [26:0] ea_page, d_vpn;
+  logic [12:0] ea_low;
+  assign ea_low  = {1'b0, rs1v[11:0]} + {1'b0, (op_store || op_storefp) ? imm_s[11:0] : imm_i[11:0]};
+  assign d_cross = !op_amo && (ea_low[12] ^ ir[31]);
+  assign d_lk_ok = !d_cross || d_retry;
+  assign d_vpn   = d_retry ? ea_page : rs1v[38:12];
+
   legend64_tlb #(.N(TLB_ENTRIES)) u_dtlb (
-      .clk, .flush(tlb_flush), .vpn(ea[38:12]), .hit(dtlb_hit), .ppn(dtlb_ppn), .perm(dtlb_perm),
+      .clk, .flush(tlb_flush), .vpn(d_vpn), .hit(dtlb_hit), .ppn(dtlb_ppn), .perm(dtlb_perm),
       .fill(ptw_fill_d), .fill_vpn(ptw_vpn), .fill_ppn(ptw_fill_ppn), .fill_level(ptw_level), .fill_perm(ptw_fill_perm)
   );
 
@@ -572,7 +584,7 @@ module legend64 #(
   // instruction, still in X, traps in the next. So no trap waits for the data TLB.
   logic d_fault_now;
   assign d_fault_now = x_first && !irq_take && x_ok && x_mem_use && !ea_misaligned && d_xlate &&
-                       (d_noncanon || (dtlb_hit && !d_perm_ok)) && !d_ptw_fault;
+                       (d_noncanon || (d_lk_ok && dtlb_hit && !d_perm_ok)) && !d_ptw_fault;
   assign exc_dpf   = x_ok && x_mem_use && !ea_misaligned && d_xlate && d_ptw_fault;
   assign x_exc  = x_first && !irq_take && (ir_flt != 2'd0 || !legal || is_ecall || is_ebreak || exc_misaligned || exc_dpf);
   assign x_trap = irq_take || x_exc;
@@ -625,7 +637,7 @@ module legend64 #(
 
   // ------------------------------------------------------------------ X: sequencing
   logic x_rd_want, x_wr_want, x_rd_req, x_wr_req, sc_ok, x_plain, x_xlate_ok;
-  assign x_xlate_ok = !d_xlate || (dtlb_hit && d_perm_ok && !d_noncanon);
+  assign x_xlate_ok = !d_xlate || (d_lk_ok && dtlb_hit && d_perm_ok && !d_noncanon);
   assign x_plain    = x_first && !x_trap && m_free && !ptw_busy && x_xlate_ok;
   // The reservation is kept and compared as a virtual address, so that the comparison does not
   // wait for the translation. Every trap and privilege return clears it, so the mapping cannot
@@ -638,7 +650,7 @@ module legend64 #(
 
   // a data access that misses the TLB starts a walk; the instruction then retries
   assign ptw_start_d = x_first && !irq_take && x_ok && x_mem_use && !ea_misaligned && d_xlate && !d_noncanon &&
-                       !dtlb_hit && !d_ptw_fault && m_free && !ptw_busy;
+                       d_lk_ok && !dtlb_hit && !d_ptw_fault && m_free && !ptw_busy;
   assign ptw_start_i = iptw_want && !ptw_start_d && !ptw_busy && m_free && x_state == X_IDLE &&
                        !(x_rd_req || x_wr_req);
 
@@ -813,11 +825,13 @@ module legend64 #(
   // address issued (issue_va) comes from D and F alone, a fetch after a change of privilege or
   // translation state is translated with the new state, and X's late signals end in registers.
   assign any_redirect = x_redirect || d_redirect;
-  assign issue_va     = d_redirect ? e_pnpc : f_pc;
-  assign fetch_va     = x_redirect ? (x_trap ? trap_target : x_npc) : issue_va;
-  assign cnt_next     = d_redirect ? 3'd0 : win_cnt - (e_take ? {1'b0, e_len} : 3'd0);
+  // A redirect from D waits a cycle too: the address issued is f_pc, a register, and the word
+  // that has just arrived decides only what is loaded into registers.
+  assign issue_va     = f_pc;
+  assign fetch_va     = x_redirect ? (x_trap ? trap_target : x_npc) : d_redirect ? e_pnpc : f_pc;
+  assign cnt_next     = win_cnt - (e_take ? {1'b0, e_len} : 3'd0);
   assign slot_free    = !pend_fetch || pend_fault || imem_rvalid;
-  assign want_fetch   = slot_free && cnt_next <= 3'd2 && (!f_halt || d_redirect) && !x_redirect;
+  assign want_fetch   = slot_free && cnt_next <= 3'd2 && !f_halt && !any_redirect;
 
   assign fetch_vpn  = issue_va[38:12];
   assign i_xlate    = satp_sv39 && priv != PRV_M;
@@ -891,6 +905,7 @@ module legend64 #(
       pend_fetch <= 1'b0; pend_kill <= 1'b0; pend_fault <= 1'b0; pend_skip <= 1'b0;
       ir_valid <= 1'b0; s_valid <= 1'b0;
       fp_valid <= 1'b0; fp_vpage <= '0; fp_ppage <= '0;
+      d_retry <= 1'b0; ea_page <= '0;
       x_state <= X_IDLE;
       m_valid <= 1'b0; m_wen <= 1'b0; m_fwen <= 1'b0; m_load <= 1'b0;
       ptw_state <= P_IDLE; ptw_kill <= 1'b0; ptw_for_i <= 1'b0; iptw_fault <= 1'b0; d_ptw_fault <= 1'b0;
@@ -1003,6 +1018,8 @@ module legend64 #(
       if (any_redirect && ptw_busy && ptw_for_i) ptw_kill <= 1'b1;
       if (d_fault_now) d_ptw_fault <= 1'b1;
       if (x_done || x_trap) d_ptw_fault <= 1'b0;
+      ea_page <= ea[38:12];
+      d_retry <= x_exec && x_mem_any && d_xlate && d_cross && !(x_done || x_trap);
 
       // ---- M
       if (m_free) begin
