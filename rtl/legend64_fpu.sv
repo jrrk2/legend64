@@ -6,13 +6,16 @@
 // registers, one wide operation to a cycle:
 //
 //   IDLE   capture the unpacked operands
-//   PREP   FMA: the mantissa product, and the addend aligned to it
-//          divide, square root, conversions: set up; float to integer: the whole conversion
+//   PREP   FMA: the mantissa product, and how far the addend is to be shifted
+//          divide, square root, conversions: set up; float to integer: the shift
 //   ADD    FMA: the sum or the difference (both differences side by side, one carry chain deep)
 //   DIV / SQRT   one bit a cycle
 //        -> an exact unsigned integer INT with a binary scale: value = INT * 2^base
+//   ALIGN  FMA: the addend shifted into place
+//   F2I    float to integer: round and saturate what PREP shifted
 //   NORM   find the leading one, keep 64 bits plus sticky
-//   ROUND  round to the target format, detect overflow/underflow, pack, into a register
+//   ROUND  the shift that makes a result below the smallest normal number denormal
+//   ROUND2 round to the target format, detect overflow/underflow, pack, into a register
 //   DONE   the result, until the core takes it
 //
 // fadd, fsub and fmul run through the fused multiply-add datapath (a*1+c, a*b+0), so there is
@@ -79,13 +82,25 @@ module legend64_fpu (
   endfunction
 
   // Round a normalised value (mant[63] is the leading one, weight 2^exp) to the target format.
+  // The first half of rounding: a result below the smallest normal number is shifted right until
+  // its exponent is the smallest one. Returns {sticky, the 64 bits kept}.
+  function automatic logic [64:0] round_shift(input logic signed [14:0] exp, input logic [63:0] mant,
+                                              input logic sticky, input logic dbl);
+    int           emin, sh;
+    logic [127:0] wide;
+    emin = dbl ? -1022 : -126;
+    sh = int'(exp) < emin ? emin - int'(exp) : 0;
+    if (sh > 64) sh = 64;
+    wide = {mant, 64'b0} >> sh;
+    return {sticky | (|wide[63:0]), wide[127:64]};
+  endfunction
+
   function automatic logic [68:0] round_pack(input logic sign, input logic signed [14:0] exp,
                                               input logic [63:0] mant, input logic sticky,
+                                              input logic [63:0] md, input logic st_d,
                                               input logic dbl, input logic [2:0] rmode);
     int          emin, emax, bias, sh;
-    logic        tiny_pre, st_d, rb, st, inc, rb_u, st_u, inc_u, carry_u, tiny, inexact, overflow, to_inf;
-    logic [127:0] wide;
-    logic [63:0] md;
+    logic        tiny_pre, rb, st, inc, rb_u, st_u, inc_u, carry_u, tiny, inexact, overflow, to_inf;
     logic [52:0] kept, kept_u;
     logic [10:0] biased;
     logic [62:0] mag_d;
@@ -98,9 +113,6 @@ module legend64_fpu (
     tiny_pre = int'(exp) < emin;
     sh = tiny_pre ? emin - int'(exp) : 0;
     if (sh > 64) sh = 64;
-    wide = {mant, 64'b0} >> sh;
-    md   = wide[127:64];
-    st_d = sticky | (|wide[63:0]);
     if (dbl) begin
       kept = md[63:11]; rb = md[10]; st = (|md[9:0]) | st_d;
       kept_u = mant[63:11]; rb_u = mant[10]; st_u = (|mant[9:0]) | sticky;
@@ -232,7 +244,10 @@ module legend64_fpu (
     else                  a_lt_b = a_cmp[62:0] > b_cmp[62:0];
   end
 
-  // float to integer (evaluated in S_PREP, from the captured operand)
+  // float to integer, from the captured operand: the shift in S_PREP, into f2i_*_q; the
+  // rounding and the saturation in S_F2I
+  logic [63:0]  f2i_int_q;
+  logic         f2i_rb_q, f2i_st_q;
   logic [127:0] f2i_wide;
   logic [63:0]  f2i_int;
   logic [64:0]  f2i_rnd;
@@ -257,13 +272,13 @@ module legend64_fpu (
     f2i_rb   = !Aq.zero & f2i_wide[63];
     f2i_st   = !Aq.zero & (|f2i_wide[62:0]);
     unique case (rm)
-      RNE: f2i_inc = f2i_rb & (f2i_st | f2i_int[0]);
+      RNE: f2i_inc = f2i_rb_q & (f2i_st_q | f2i_int_q[0]);
       RTZ: f2i_inc = 1'b0;
-      RDN: f2i_inc = Aq.sign & (f2i_rb | f2i_st);
-      RUP: f2i_inc = !Aq.sign & (f2i_rb | f2i_st);
-      default: f2i_inc = f2i_rb;
+      RDN: f2i_inc = Aq.sign & (f2i_rb_q | f2i_st_q);
+      RUP: f2i_inc = !Aq.sign & (f2i_rb_q | f2i_st_q);
+      default: f2i_inc = f2i_rb_q;
     endcase
-    f2i_rnd = {1'b0, f2i_int} + 65'(f2i_inc);
+    f2i_rnd = {1'b0, f2i_int_q} + 65'(f2i_inc);
     // out of range for the destination type?
     f2i_ovf = Aq.nan | Aq.inf | (!Aq.zero && int'(Aq.exp) > 63);
     unique case ({f2i_long, f2i_unsigned})
@@ -283,7 +298,7 @@ module legend64_fpu (
     end else begin
       f2i_v   = Aq.sign ? -f2i_rnd[63:0] : f2i_rnd[63:0];
       f2i_res = f2i_long ? f2i_v : {{32{f2i_v[31]}}, f2i_v[31:0]};
-      f2i_fl  = {4'b0, f2i_rb | f2i_st};
+      f2i_fl  = {4'b0, f2i_rb_q | f2i_st_q};
     end
   end
 
@@ -365,7 +380,7 @@ module legend64_fpu (
   end
 
   // ------------------------------------------------------------------ sequenced datapath
-  typedef enum logic [3:0] {S_IDLE, S_PREP, S_ADD, S_DIV, S_SQRT, S_NORM, S_ROUND, S_DONE} state_e;
+  typedef enum logic [3:0] {S_IDLE, S_PREP, S_ALIGN, S_ADD, S_F2I, S_DIV, S_SQRT, S_NORM, S_ROUND, S_ROUND2, S_DONE} state_e;
   state_e state;
 
   logic [105:0]       prod;
@@ -384,7 +399,9 @@ module legend64_fpu (
   logic [59:0]        sq_rem;
   logic [55:0]        sq_root;
 
-  // FMA: the addend aligned to the product (evaluated in S_PREP, beside the multiplication)
+  // FMA: the addend aligned to the product: the distance in S_PREP, beside the multiplication,
+  // and the shift in S_ALIGN
+  logic [7:0]         fma_dcl_q;
   logic signed [14:0] ep, fma_d;
   logic               fma_clamp;
   logic [7:0]         fma_dcl;
@@ -395,7 +412,7 @@ module legend64_fpu (
     fma_d     = ep - M3.exp + 15'sd56;
     fma_clamp = p_zero || (!M3.zero && fma_d < 0);
     fma_dcl   = fma_clamp ? 8'd0 : (fma_d > 15'sd163) ? 8'd163 : fma_d[7:0];
-    c_sh      = {M3.zero ? 53'b0 : M3.mant, 110'b0, 163'b0} >> fma_dcl;
+    c_sh      = {M3.zero ? 53'b0 : M3.mant, 110'b0, 163'b0} >> fma_dcl_q;
     c_fr      = {1'b0, c_sh[325:164], c_sh[163] | (|c_sh[162:0])};
   end
   logic [163:0]       c_fr_q;
@@ -450,7 +467,9 @@ module legend64_fpu (
   assign busy = state != S_IDLE;
 
   logic [68:0] rp;
-  assign rp = round_pack(sign_q, n_exp, n_mant, n_sticky, dbl, rm);
+  logic [63:0] r_md;
+  logic        r_std;
+  assign rp = round_pack(sign_q, n_exp, n_mant, n_sticky, r_md, r_std, dbl, rm);
 
   always_comb begin
     done = 1'b0; result = '0; flags = '0;
@@ -476,6 +495,7 @@ module legend64_fpu (
       int_q <= '0; base_q <= '0; sign_q <= 1'b0; zsign_q <= 1'b0;
       n_mant <= '0; n_sticky <= 1'b0; n_zero <= 1'b0; n_exp <= '0;
       res_q <= '0; fl_q <= '0;
+      r_md <= '0; r_std <= 1'b0; f2i_int_q <= '0; f2i_rb_q <= 1'b0; f2i_st_q <= 1'b0; fma_dcl_q <= '0;
       cnt <= '0; dv_q <= '0; dv_r <= '0; sq_n <= '0; sq_rem <= '0; sq_root <= '0;
     end else begin
       unique case (state)
@@ -485,10 +505,10 @@ module legend64_fpu (
         end
         S_PREP: begin
           if (is_fma) begin        // the product is registered above
-            c_fr_q     <= c_fr;
+            fma_dcl_q  <= fma_dcl;
             fma_base_q <= fma_clamp ? M3.exp - 15'sd162 : ep - 15'sd106;
             p_sign_q   <= p_sign; c_sign_q <= c_sign; p_zero_q <= p_zero;
-            state <= S_ADD;
+            state <= S_ALIGN;
           end else if (is_div) begin
             dv_r <= {3'b0, Aq.mant}; dv_q <= '0; cnt <= 7'd58;
             sign_q <= Aq.sign ^ Bq.sign;
@@ -502,12 +522,20 @@ module legend64_fpu (
             int_q <= {101'b0, i2f_mag}; base_q <= '0; sign_q <= i2f_neg;
             state <= S_NORM;
           end else if (is_f2i) begin
-            res_q <= f2i_res; fl_q <= f2i_fl;
-            state <= S_DONE;
+            f2i_int_q <= f2i_int; f2i_rb_q <= f2i_rb; f2i_st_q <= f2i_st;
+            state <= S_F2I;
           end else begin  // float to float
             int_q <= {112'b0, Asq.mant}; base_q <= Asq.exp - 15'sd52; sign_q <= Asq.sign;
             state <= S_NORM;
           end
+        end
+        S_ALIGN: begin
+          c_fr_q <= c_fr;
+          state  <= S_ADD;
+        end
+        S_F2I: begin
+          res_q <= f2i_res; fl_q <= f2i_fl;
+          state <= S_DONE;
         end
         S_ADD: begin
           int_q   <= fma_mag;
@@ -548,6 +576,10 @@ module legend64_fpu (
           state    <= S_ROUND;
         end
         S_ROUND: begin
+          {r_std, r_md} <= round_shift(n_exp, n_mant, n_sticky, dbl);
+          state <= S_ROUND2;
+        end
+        S_ROUND2: begin
           if (n_zero) begin res_q <= dbl ? {sign_q, 63'b0} : {32'hffff_ffff, sign_q, 31'b0}; fl_q <= '0; end
           else        begin res_q <= rp[63:0]; fl_q <= rp[68:64]; end
           state <= S_DONE;
