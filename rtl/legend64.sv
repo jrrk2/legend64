@@ -612,15 +612,20 @@ module legend64 #(
   end
 
   // ------------------------------------------------------------------ page-table walker
-  typedef enum logic [1:0] {P_IDLE, P_REQ, P_WAIT} pstate_e;
+  // The entry read is registered (P_WAIT) and examined in the next cycle (P_CHK), so that the
+  // memory's read data ends in a register and not in the TLBs. A walk that was under way when
+  // the TLBs were flushed read the old tables: it runs to its end but fills nothing (ptw_stale).
+  typedef enum logic [1:0] {P_IDLE, P_REQ, P_WAIT, P_CHK} pstate_e;
   pstate_e     ptw_state;
+  logic        ptw_stale;
+  logic [63:0] pte_q;
   logic        ptw_for_i, ptw_kill, ptw_busy, ptw_start_d, ptw_start_i, iptw_want;
   logic [43:0] ptw_a;
   logic [63:0] pte;
   logic        pte_bad, pte_leaf, pte_fault, iptw_fault;
   logic [26:0] iptw_fault_vpn, fetch_vpn;
   assign ptw_busy = ptw_state != P_IDLE;
-  assign pte      = dmem_rdata;
+  assign pte      = pte_q;
   assign pte_leaf = pte[1] || pte[3];
   assign pte_bad  = !pte[0] || (!pte[1] && pte[2]) || pte[63:54] != '0;
   always_comb begin
@@ -632,8 +637,8 @@ module legend64 #(
   end
   assign ptw_fill_ppn  = pte[53:10];
   assign ptw_fill_perm = {pte[7], pte[4], pte[3], pte[2], pte[1]};
-  assign ptw_fill_d    = ptw_state == P_WAIT && dmem_rvalid && !pte_fault && pte_leaf && !ptw_for_i;
-  assign ptw_fill_i    = ptw_state == P_WAIT && dmem_rvalid && !pte_fault && pte_leaf && ptw_for_i;
+  assign ptw_fill_d    = ptw_state == P_CHK && !ptw_stale && !pte_fault && pte_leaf && !ptw_for_i;
+  assign ptw_fill_i    = ptw_state == P_CHK && !ptw_stale && !pte_fault && pte_leaf && ptw_for_i;
 
   // ------------------------------------------------------------------ X: sequencing
   logic x_rd_want, x_wr_want, x_rd_req, x_wr_req, sc_ok, x_plain, x_xlate_ok;
@@ -940,7 +945,7 @@ module legend64 #(
       d_retry <= 1'b0; ea_page <= '0;
       x_state <= X_IDLE;
       m_valid <= 1'b0; m_wen <= 1'b0; m_fwen <= 1'b0; m_load <= 1'b0;
-      ptw_state <= P_IDLE; ptw_kill <= 1'b0; ptw_for_i <= 1'b0; iptw_fault <= 1'b0; d_ptw_fault <= 1'b0;
+      ptw_state <= P_IDLE; ptw_kill <= 1'b0; ptw_stale <= 1'b0; pte_q <= '0; ptw_for_i <= 1'b0; iptw_fault <= 1'b0; d_ptw_fault <= 1'b0;
       priv <= PRV_M;
       mstatus_sie <= 1'b0; mstatus_mie <= 1'b0; mstatus_spie <= 1'b0; mstatus_mpie <= 1'b0;
       mstatus_spp <= 1'b0; mstatus_mprv <= 1'b0; mstatus_sum <= 1'b0; mstatus_mxr <= 1'b0;
@@ -1027,12 +1032,17 @@ module legend64 #(
           ptw_state <= P_REQ;
           ptw_for_i <= !ptw_start_d;
           ptw_kill  <= 1'b0;
+          ptw_stale <= 1'b0;
           ptw_vpn   <= ptw_start_d ? ea[38:12] : fetch_vpn;
           ptw_level <= 2'd2;
           ptw_a     <= satp_ppn;
         end
         P_REQ: if (dmem_gnt) ptw_state <= P_WAIT;
         P_WAIT: if (dmem_rvalid) begin
+          pte_q     <= dmem_rdata;
+          ptw_state <= P_CHK;
+        end
+        P_CHK: begin
           if (pte_fault) begin
             ptw_state <= P_IDLE;
             if (!ptw_for_i) d_ptw_fault <= 1'b1;
@@ -1048,6 +1058,7 @@ module legend64 #(
         default: ptw_state <= P_IDLE;
       endcase
       if (any_redirect && ptw_busy && ptw_for_i) ptw_kill <= 1'b1;
+      if (tlb_flush && ptw_busy) ptw_stale <= 1'b1;
       if (d_fault_now) d_ptw_fault <= 1'b1;
       if (x_done || x_trap) d_ptw_fault <= 1'b0;
       ea_page <= ea[38:12];
