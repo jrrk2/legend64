@@ -567,8 +567,13 @@ module legend64 #(
   assign x_mem_use = x_mem_any && !(is_sc && !resv_valid);
   assign x_ok      = ir_flt == 2'd0 && legal;
   assign exc_misaligned = x_ok && x_mem_any && ea_misaligned;
-  assign exc_dpf   = x_ok && x_mem_use && !ea_misaligned && d_xlate &&
-                     (d_noncanon || (dtlb_hit && !d_perm_ok) || d_ptw_fault);
+  // A data page fault is taken from a register: the cycle that finds one (a non-canonical
+  // address, a permission the entry does not give, or a failed walk) sets d_ptw_fault, and the
+  // instruction, still in X, traps in the next. So no trap waits for the data TLB.
+  logic d_fault_now;
+  assign d_fault_now = x_first && !irq_take && x_ok && x_mem_use && !ea_misaligned && d_xlate &&
+                       (d_noncanon || (dtlb_hit && !d_perm_ok)) && !d_ptw_fault;
+  assign exc_dpf   = x_ok && x_mem_use && !ea_misaligned && d_xlate && d_ptw_fault;
   assign x_exc  = x_first && !irq_take && (ir_flt != 2'd0 || !legal || is_ecall || is_ebreak || exc_misaligned || exc_dpf);
   assign x_trap = irq_take || x_exc;
   always_comb begin
@@ -622,7 +627,10 @@ module legend64 #(
   logic x_rd_want, x_wr_want, x_rd_req, x_wr_req, sc_ok, x_plain, x_xlate_ok;
   assign x_xlate_ok = !d_xlate || (dtlb_hit && d_perm_ok && !d_noncanon);
   assign x_plain    = x_first && !x_trap && m_free && !ptw_busy && x_xlate_ok;
-  assign sc_ok      = resv_valid && resv_addr == d_paddr;
+  // The reservation is kept and compared as a virtual address, so that the comparison does not
+  // wait for the translation. Every trap and privilege return clears it, so the mapping cannot
+  // change under it; the same memory through another virtual address fails, which is allowed.
+  assign sc_ok      = resv_valid && resv_addr == ea;
   assign x_rd_want  = op_load || op_loadfp || is_lr || is_amo_rmw;
   assign x_wr_want  = op_store || op_storefp || (is_sc && sc_ok);
   assign x_rd_req   = x_plain && x_rd_want;
@@ -644,31 +652,38 @@ module legend64 #(
   logic x_single, x_refetch;
   assign x_single  = op_lui || op_auipc || op_jal || op_jalr || op_branch || is_alu || op_miscmem || op_system;
   assign fpu_start = x_exec && x_state == X_IDLE && !x_trap && fp_any && x_ok;
+  // x_done in two halves. Only an instruction that does not use the data port can redirect or
+  // change how code is fetched, so the redirect is built from the half (x_done_nm) that does
+  // not wait for the data port's grant.
+  logic x_go, x_done_nm, x_done_m;
+  assign x_go = x_exec && m_free && !x_trap;
   always_comb begin
-    x_done = 1'b0;
-    if (x_exec && m_free && !x_trap) begin
-      unique case (x_state)
-        X_IDLE: begin
-          if (fp_any) x_done = fpu_start && fpu_done;
-          else if (fpu_busy) x_done = 1'b0;
-          else if (x_single) x_done = 1'b1;
-          else if (is_sc && !sc_ok) x_done = !resv_valid || (x_plain);   // fails: needs no bus cycle
-          else if (x_rd_want && !is_amo_rmw) x_done = x_rd_req && dmem_gnt;
-          else if (x_wr_want) x_done = x_wr_req && dmem_gnt;
-        end
-        X_MUL: x_done = 1'b1;
-        X_DIV: x_done = div_cnt == 0;
-        X_AMO_ST: x_done = x_wr_req && dmem_gnt;
-        default: ;
-      endcase
-    end
+    x_done_nm = 1'b0;
+    x_done_m  = 1'b0;
+    unique case (x_state)
+      X_IDLE: begin
+        if (fp_any) x_done_nm = fpu_start && fpu_done;
+        else if (fpu_busy) ;
+        else if (x_single) x_done_nm = 1'b1;
+        else if (is_sc && !sc_ok) x_done_m = !resv_valid || (x_plain);   // fails: needs no bus cycle
+        else if (x_rd_want && !is_amo_rmw) x_done_m = x_rd_req && dmem_gnt;
+        else if (x_wr_want) x_done_m = x_wr_req && dmem_gnt;
+      end
+      X_MUL: x_done_nm = 1'b1;
+      X_DIV: x_done_nm = div_cnt == 0;
+      X_AMO_ST: x_done_m = x_wr_req && dmem_gnt;
+      default: ;
+    endcase
+    x_done_nm = x_done_nm && x_go && !x_mem_any;
+    x_done_m  = x_done_m  && x_go && x_mem_any;
+    x_done    = x_done_nm || x_done_m;
   end
   // Refetch what follows whenever the instruction may have changed how code is fetched:
   // fence.i, sfence.vma, any CSR access, and the privilege returns. Plain fence (which
   // includes the pause hint) is a no-op.
   assign x_refetch  = (op_miscmem && f3[0]) || is_sfence || is_csr || is_mret || is_sret;
-  assign x_redirect = x_trap || (x_done && (x_npc != ir_pnpc || x_refetch));
-  assign tlb_flush  = !rst_n || (x_done && (is_sfence || (is_csr && csr_write && csr_addr == 12'h180)));
+  assign x_redirect = x_trap || (x_done_nm && (x_npc != ir_pnpc || x_refetch));
+  assign tlb_flush  = !rst_n || (x_done_nm && (is_sfence || (is_csr && csr_write && csr_addr == 12'h180)));
 
   // value and destination handed to M
   logic        x_wen, x_fwen, x_is_load;
@@ -917,7 +932,7 @@ module legend64 #(
       if (any_redirect || fault_issue) iptw_fault <= 1'b0;
 
       // ---- fetch page: dropped whenever privilege or translation may have changed
-      if (x_trap || (x_done && x_refetch)) fp_valid <= 1'b0;
+      if (x_trap || (x_done_nm && x_refetch)) fp_valid <= 1'b0;
       else if (fp_load) begin
         fp_valid <= 1'b1;
         fp_vpage <= issue_va[63:12];
@@ -986,6 +1001,7 @@ module legend64 #(
         default: ptw_state <= P_IDLE;
       endcase
       if (any_redirect && ptw_busy && ptw_for_i) ptw_kill <= 1'b1;
+      if (d_fault_now) d_ptw_fault <= 1'b1;
       if (x_done || x_trap) d_ptw_fault <= 1'b0;
 
       // ---- M
@@ -1046,7 +1062,7 @@ module legend64 #(
       mcycle <= mcycle + 64'd1;
       if (x_done) begin
         minstret <= minstret + 64'd1;
-        if (is_lr) begin resv_valid <= 1'b1; resv_addr <= d_paddr; end
+        if (is_lr) begin resv_valid <= 1'b1; resv_addr <= ea; end
         if (is_sc) resv_valid <= 1'b0;
         if (fp_any) begin
           fflags <= fflags | fpu_flags;
