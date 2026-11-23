@@ -796,15 +796,47 @@ module legend64 #(
   assign e_insn = e_c ? (e_rvc_ill ? 32'h0 : e_rvc_x) : win_data[31:0];
   assign e_raw  = e_c ? {16'h0, win_data[15:0]} : win_data[31:0];
 
-  assign e_jal      = e_insn[6:0] == 7'b1101111;
-  assign e_jalr     = e_insn[6:0] == 7'b1100111;
-  assign e_br       = e_insn[6:0] == 7'b1100011;
-  assign e_link_rd  = e_insn[11:7] == 5'd1 || e_insn[11:7] == 5'd5;
-  assign e_link_rs1 = e_insn[19:15] == 5'd1 || e_insn[19:15] == 5'd5;
+  // What the prediction needs is decoded from the parcels as fetched, beside the expansion of a
+  // compressed instruction and not after it: the kind of jump, whether it links, and its offset.
+  logic [15:0] pc16;
+  logic [31:0] pc32;
+  logic        c_j, c_b, c_jalr;
+  assign pc16   = win_data[15:0];
+  assign pc32   = win_data[31:0];
+  assign c_j    = pc16[1:0] == 2'b01 && pc16[15:13] == 3'b101;
+  assign c_b    = pc16[1:0] == 2'b01 && pc16[15:14] == 2'b11;
+  assign c_jalr = pc16[1:0] == 2'b10 && pc16[15:13] == 3'b100 && pc16[6:2] == 5'd0 && pc16[11:7] != 5'd0;
+  assign e_jal      = e_c ? c_j    : pc32[6:0] == 7'b1101111;
+  assign e_jalr     = e_c ? c_jalr : pc32[6:0] == 7'b1100111;
+  assign e_br       = e_c ? c_b    : pc32[6:0] == 7'b1100011;
+  assign e_link_rd  = e_c ? (c_jalr && pc16[12]) : (pc32[11:7] == 5'd1 || pc32[11:7] == 5'd5);
+  assign e_link_rs1 = e_c ? (pc16[11:7] == 5'd1 || pc16[11:7] == 5'd5) : (pc32[19:15] == 5'd1 || pc32[19:15] == 5'd5);
   assign e_call     = (e_jal || e_jalr) && e_link_rd;
   assign e_ret      = e_jalr && e_link_rs1 && !e_link_rd;
-  assign e_imm_j    = {{43{e_insn[31]}}, e_insn[31], e_insn[19:12], e_insn[20], e_insn[30:21], 1'b0};
-  assign e_imm_b    = {{51{e_insn[31]}}, e_insn[31], e_insn[7], e_insn[30:25], e_insn[11:8], 1'b0};
+  assign e_imm_j    = e_c ? {{53{pc16[12]}}, pc16[8], pc16[10:9], pc16[6], pc16[7], pc16[2], pc16[11], pc16[5:3], 1'b0}
+                          : {{43{pc32[31]}}, pc32[31], pc32[19:12], pc32[20], pc32[30:21], 1'b0};
+  assign e_imm_b    = e_c ? {{56{pc16[12]}}, pc16[6:5], pc16[2], pc16[11:10], pc16[4:3], 1'b0}
+                          : {{51{pc32[31]}}, pc32[31], pc32[7], pc32[30:25], pc32[11:8], 1'b0};
+`ifndef SYNTHESIS
+  // the same facts from the expanded instruction: the two must agree
+  logic        k_jal, k_jalr, k_br, k_lrd, k_lrs1;
+  logic [63:0] k_imm_j, k_imm_b;
+  assign k_jal   = e_insn[6:0] == 7'b1101111;
+  assign k_jalr  = e_insn[6:0] == 7'b1100111;
+  assign k_br    = e_insn[6:0] == 7'b1100011;
+  assign k_lrd   = e_insn[11:7] == 5'd1 || e_insn[11:7] == 5'd5;
+  assign k_lrs1  = e_insn[19:15] == 5'd1 || e_insn[19:15] == 5'd5;
+  assign k_imm_j = {{43{e_insn[31]}}, e_insn[31], e_insn[19:12], e_insn[20], e_insn[30:21], 1'b0};
+  assign k_imm_b = {{51{e_insn[31]}}, e_insn[31], e_insn[7], e_insn[30:25], e_insn[11:8], 1'b0};
+  always @(posedge clk) if (rst_n && e_have) begin
+    if (k_jal != e_jal || k_jalr != e_jalr || k_br != e_br ||
+        ((k_jal || k_jalr) && k_lrd) != e_call || (k_jalr && k_lrs1 && !k_lrd) != e_ret ||
+        (k_jal && k_imm_j != e_imm_j) || (k_br && k_imm_b != e_imm_b)) begin
+      $display("PREDECODE MISMATCH pc=%h raw=%h insn=%h", buf_pc, pc32, e_insn);
+      $stop;
+    end
+  end
+`endif
   assign e_seq      = buf_pc + (e_c ? 64'd2 : 64'd4);
   assign e_tgt      = buf_pc + (e_jal ? e_imm_j : e_imm_b);
   assign e_ctr      = bht[buf_pc[BHT_BITS:1]];
