@@ -3,7 +3,9 @@
 // modes and Sv39 virtual memory.
 //
 // Pipeline:
-//   F  issue an instruction address (translated through the instruction TLB)
+//   F  issue an instruction address. The page being fetched from is held, translated, in a
+//      register (fp_*): an address in that page goes out with no lookup in its way. An address
+//      in another page spends one cycle in the instruction TLB, which loads the register.
 //   D  the fetched word joins a small parcel buffer; one instruction (16 or 32 bits, possibly
 //      straddling two words) is taken from it, expanded if compressed, and its successor is
 //      predicted: direct jumps, two-bit counters for conditional branches, a return-address
@@ -137,6 +139,8 @@ module legend64 #(
   logic [63:0] f_pc;                 // next parcel to fetch
   logic        f_halt;               // a fetch fault is queued; wait for the redirect
   logic        pend_fetch, pend_kill, pend_fault, pend_skip;
+  logic        fp_valid;             // the fetch page: virtual page and what it translates to
+  logic [51:0] fp_vpage, fp_ppage;
   logic [63:0] buf_data;             // up to four 16-bit parcels
   logic [3:0]  buf_flt;
   logic [2:0]  buf_cnt;
@@ -778,11 +782,13 @@ module legend64 #(
   assign e_tgt      = buf_pc + (e_jal ? e_imm_j : e_imm_b);
   assign e_ctr      = bht[buf_pc[BHT_BITS:1]];
   assign e_pnpc     = e_flt != 2'd0 ? e_seq : e_jal ? e_tgt : (e_br && e_ctr[1]) ? e_tgt : e_ret ? ras[0] : e_seq;
-  assign d_redirect = e_take && e_pnpc != e_seq;
+  // by what was predicted, not by comparing the addresses: a jump to the next instruction
+  // redirects to where the fetch was going anyway
+  assign d_redirect = e_take && e_flt == 2'd0 && (e_jal || (e_br && e_ctr[1]) || e_ret);
 
   // ------------------------------------------------------------------ F: fetch address and translation
   logic        any_redirect, slot_free, want_fetch, i_xlate, i_noncanon, itlb_hit, i_perm_ok,
-               i_fault_now, i_need_walk, fetch_issue, fault_issue;
+               i_fault_now, i_need_walk, fetch_issue, fault_issue, fp_match, fp_load;
   logic [2:0]  cnt_next;
   logic [63:0] fetch_va, issue_va, fetch_pa;
   logic [43:0] itlb_ppn;
@@ -804,18 +810,22 @@ module legend64 #(
   assign i_perm_ok  = itlb_perm[2] && (priv == PRV_U ? itlb_perm[3] : !itlb_perm[3]);
   assign i_fault_now = i_xlate && (i_noncanon || (itlb_hit && !i_perm_ok) || (iptw_fault && iptw_fault_vpn == fetch_vpn));
   assign i_need_walk = i_xlate && !i_noncanon && !itlb_hit && !(iptw_fault && iptw_fault_vpn == fetch_vpn);
-  assign fetch_pa    = i_xlate ? {8'b0, itlb_ppn, issue_va[11:2], 2'b00} : {issue_va[63:2], 2'b00};
+  // The address that goes out is the registered page and the offset. Whether it may go out
+  // (fp_match) and the lookup of another page end in registers, not in the memory's address.
+  assign fp_match    = fp_valid && issue_va[63:12] == fp_vpage;
+  assign fp_load     = want_fetch && !fp_match && !i_fault_now && !i_need_walk;
+  assign fetch_pa    = {fp_ppage, issue_va[11:2], 2'b00};
 
   legend64_tlb #(.N(TLB_ENTRIES)) u_itlb (
       .clk, .flush(tlb_flush), .vpn(fetch_vpn), .hit(itlb_hit), .ppn(itlb_ppn), .perm(itlb_perm),
       .fill(ptw_fill_i), .fill_vpn(ptw_vpn), .fill_ppn(ptw_fill_ppn), .fill_level(ptw_level), .fill_perm(ptw_fill_perm)
   );
 
-  assign imem_req    = want_fetch && !i_fault_now && !i_need_walk;
+  assign imem_req    = want_fetch && fp_match;
   assign imem_addr   = fetch_pa;
   assign fetch_issue = imem_req && imem_gnt;
-  assign fault_issue = want_fetch && i_fault_now;
-  assign iptw_want   = want_fetch && i_need_walk;
+  assign fault_issue = want_fetch && !fp_match && i_fault_now;
+  assign iptw_want   = want_fetch && !fp_match && i_need_walk;
 
   // ------------------------------------------------------------------ sequential: memories
   logic [BHT_BITS-1:0] bht_idx;
@@ -865,6 +875,7 @@ module legend64 #(
       f_pc <= RESET_PC; buf_pc <= RESET_PC; buf_cnt <= '0; buf_flt <= '0; f_halt <= 1'b0;
       pend_fetch <= 1'b0; pend_kill <= 1'b0; pend_fault <= 1'b0; pend_skip <= 1'b0;
       ir_valid <= 1'b0; s_valid <= 1'b0;
+      fp_valid <= 1'b0; fp_vpage <= '0; fp_ppage <= '0;
       x_state <= X_IDLE;
       m_valid <= 1'b0; m_wen <= 1'b0; m_fwen <= 1'b0; m_load <= 1'b0;
       ptw_state <= P_IDLE; ptw_kill <= 1'b0; ptw_for_i <= 1'b0; iptw_fault <= 1'b0; d_ptw_fault <= 1'b0;
@@ -904,6 +915,14 @@ module legend64 #(
       if (any_redirect) f_halt <= fault_issue;
       else if (fault_issue) f_halt <= 1'b1;
       if (any_redirect || fault_issue) iptw_fault <= 1'b0;
+
+      // ---- fetch page: dropped whenever privilege or translation may have changed
+      if (x_trap || (x_done && x_refetch)) fp_valid <= 1'b0;
+      else if (fp_load) begin
+        fp_valid <= 1'b1;
+        fp_vpage <= issue_va[63:12];
+        fp_ppage <= i_xlate ? {8'b0, itlb_ppn} : issue_va[63:12];
+      end
 
       // ---- parcel buffer
       if (any_redirect) begin
