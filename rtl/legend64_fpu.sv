@@ -14,7 +14,8 @@
 //        -> an exact unsigned integer INT with a binary scale: value = INT * 2^base
 //   ALIGN  FMA: the addend shifted into place
 //   F2I    float to integer: round and saturate what PREP shifted
-//   NORM   find the leading one, keep 64 bits plus sticky
+//   NORM   find the leading one
+//   NORM2  shift it to the top, keep 64 bits plus sticky
 //   ROUND  the shift that makes a result below the smallest normal number denormal
 //   ROUND2 round to the target format, detect overflow/underflow, pack, into a register
 //   DONE   the result, until the core takes it
@@ -382,7 +383,7 @@ module legend64_fpu (
   end
 
   // ------------------------------------------------------------------ sequenced datapath
-  typedef enum logic [3:0] {S_IDLE, S_UNP, S_PREP, S_ALIGN, S_ADD, S_F2I, S_DIV, S_SQRT, S_NORM, S_ROUND, S_ROUND2, S_DONE} state_e;
+  typedef enum logic [3:0] {S_IDLE, S_UNP, S_PREP, S_ALIGN, S_ADD, S_F2I, S_DIV, S_SQRT, S_NORM, S_NORM2, S_ROUND, S_ROUND2, S_DONE} state_e;
   state_e state;
 
   logic [105:0]       prod;
@@ -450,13 +451,14 @@ module legend64_fpu (
     i2f_mag = i2f_neg ? -i2f_val : i2f_val;
   end
 
-  // normalise (evaluated in S_NORM)
+  // normalise: the count of leading zeros in S_NORM, into nz_q; the shift in S_NORM2
   int           nz;
+  logic [7:0]   nz_q;
   logic [164:0] n_shifted;
   always_comb begin
     nz = 165;
     for (int i = 0; i <= 164; i++) if (int_q[i]) nz = 164 - i;   // the highest set bit wins
-    n_shifted = int_q << (nz == 165 ? 0 : nz);
+    n_shifted = int_q << (nz_q == 8'd165 ? 8'd0 : nz_q);
   end
 
   // divide and square-root steps
@@ -498,7 +500,7 @@ module legend64_fpu (
       int_q <= '0; base_q <= '0; sign_q <= 1'b0; zsign_q <= 1'b0;
       n_mant <= '0; n_sticky <= 1'b0; n_zero <= 1'b0; n_exp <= '0;
       res_q <= '0; fl_q <= '0;
-      r_md <= '0; r_std <= 1'b0; f2i_int_q <= '0; f2i_rb_q <= 1'b0; f2i_st_q <= 1'b0; fma_dcl_q <= '0;
+      nz_q <= '0; r_md <= '0; r_std <= 1'b0; f2i_int_q <= '0; f2i_rb_q <= 1'b0; f2i_st_q <= 1'b0; fma_dcl_q <= '0;
       cnt <= '0; dv_q <= '0; dv_r <= '0; sq_n <= '0; sq_rem <= '0; sq_root <= '0;
     end else begin
       unique case (state)
@@ -579,11 +581,15 @@ module legend64_fpu (
           end
         end
         S_NORM: begin
-          n_zero   <= nz == 165;
+          nz_q  <= 8'(nz);
+          state <= S_NORM2;
+        end
+        S_NORM2: begin
+          n_zero   <= nz_q == 8'd165;
           n_mant   <= n_shifted[164:101];
           n_sticky <= |n_shifted[100:0];
-          n_exp    <= base_q + 15'(164 - nz);
-          if (nz == 165) sign_q <= zsign_q;   // an exact zero: only the FMA path gets here
+          n_exp    <= base_q + 15'(164 - int'(nz_q));
+          if (nz_q == 8'd165) sign_q <= zsign_q;   // an exact zero: only the FMA path gets here
           state    <= S_ROUND;
         end
         S_ROUND: begin
