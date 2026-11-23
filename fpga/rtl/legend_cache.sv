@@ -11,7 +11,9 @@
 // A third, "device" port lets a DMA master (the Ethernet MAC) read and write memory through
 // the same cache, so what the device and the CPU see is always coherent and packet data the
 // device has just written is already in the cache when the CPU reads it. It shares the data
-// port's block-RAM port; when both ask in the same cycle they alternate.
+// port's block-RAM port; when both ask in the same cycle they alternate. Which of the two is
+// granted depends on registers and on the device's request, never on the core's request, which
+// arrives late in the cycle: the core's grant must not wait for it.
 //
 // Memory side: a four-phase request/acknowledge handshake carrying a whole line. mem_addr,
 // mem_we and mem_wdata are held steady while mem_req is high, and mem_rdata is steady while
@@ -90,7 +92,7 @@ module legend_cache #(
   assign i_gnt    = state == S_RUN && (!i_pend || i_hit);
   // the data-side slot is shared by the core's data port and the device port
   assign slot_free = state == S_RUN && (!d_pend || (d_hit && !d_pwe));
-  assign take_e    = e_req && (!d_req || prefer_e);
+  assign take_e    = e_req && prefer_e;
   assign d_gnt     = slot_free && !take_e;
   assign e_gnt     = slot_free && take_e;
   assign s_addr    = take_e ? e_addr : d_addr;
@@ -156,7 +158,7 @@ module legend_cache #(
       state  <= S_RUN;
       i_pend <= 1'b0;
       d_pend <= 1'b0;
-      prefer_e <= 1'b0;
+      prefer_e <= 1'b1;
       // the pending requests' details and the line being replaced: loaded before they are used
       i_pa <= '0; d_pa <= '0; d_psrc <= 1'b0; d_pwe <= 1'b0; d_pwd <= '0; d_pbe <= '0;
       fill_addr <= '0; v_line <= '0; v_tag <= '0;
@@ -169,8 +171,9 @@ module legend_cache #(
           if (slot_free && (d_req || e_req)) begin
             d_pend <= 1'b1; d_psrc <= take_e; d_pa <= s_addr;
             d_pwe <= take_e ? e_we : d_we; d_pwd <= take_e ? e_wdata : d_wdata; d_pbe <= take_e ? e_be : d_be;
-            if (d_req && e_req) prefer_e <= !take_e;
           end
+          // the device goes first unless it has just been served while the core waited
+          if (slot_free) prefer_e <= !(take_e && d_req);
           if (d_miss)      begin fill_addr <= d_pa; state <= S_VREAD; end
           else if (i_miss) begin fill_addr <= i_pa; state <= S_VREAD; end
         end

@@ -7,10 +7,13 @@
 //   D  the fetched word joins a small parcel buffer; one instruction (16 or 32 bits, possibly
 //      straddling two words) is taken from it, expanded if compressed, and its successor is
 //      predicted: direct jumps, two-bit counters for conditional branches, a return-address
-//      stack. A predicted redirect issues the new fetch in the same cycle.
+//      stack. A predicted redirect issues the new fetch in the same cycle. D hands the
+//      instruction to X through a second register (the skid) when X is not ready, so that
+//      whether D takes an instruction depends on registers alone and never on X's progress.
 //   X  read registers (one bypass from M), execute, resolve the prediction, take traps and
 //      interrupts, translate and issue load/store requests. Everything that can trap or
-//      redirect does so here: X is the single commit point.
+//      redirect does so here: X is the single commit point. A redirect from X is fetched in
+//      the cycle after it: nothing in X reaches the fetch address combinationally.
 //   M  load data returns; the integer or floating-point register file is written
 //
 // Multiply (2 cycles), divide (66), atomics and sequenced floating-point operations hold the
@@ -143,6 +146,11 @@ module legend64 #(
   logic [1:0]  ir_flt;               // 1: page fault on the first parcel, 2: on the second
   logic [31:0] ir, ir_raw;
   logic [63:0] ir_pc, ir_pnpc;
+  // the skid: one instruction waiting behind the one in X
+  logic        s_valid, s_c;
+  logic [1:0]  s_flt;
+  logic [31:0] s_ir, s_raw;
+  logic [63:0] s_pc, s_pnpc;
 
   typedef enum logic [2:0] {X_IDLE, X_MUL, X_DIV, X_AMO_WAIT, X_AMO_ST} xstate_e;
   xstate_e x_state;
@@ -724,7 +732,7 @@ module legend64 #(
 
   assign ir_stays  = ir_valid && !x_done && !x_trap;
   // x_redirect is deliberately not a term here: it arrives late, and on a redirect the window
-  // is discarded anyway (e_take is false and the buffer count is cleared)
+  // is discarded anyway (the buffer count is cleared, and what D took is dropped)
   assign arr_valid = pend_fetch && (pend_fault || imem_rvalid) && !pend_kill;
   assign arr_word  = pend_fault ? 32'h0 : imem_rdata;
   always_comb begin
@@ -751,7 +759,9 @@ module legend64 #(
   assign e_flt  = win_flt[0] ? 2'd1 : (!e_c && win_flt[1]) ? 2'd2 : 2'd0;
   assign e_len  = (win_flt[0] || e_c) ? 2'd1 : 2'd2;
   assign e_have = win_cnt >= {1'b0, e_len};
-  assign e_take = e_have && !ir_stays && !x_redirect;
+  // from registers and the window only: an instruction taken while X keeps its own goes to the
+  // skid, and one taken in the cycle of a redirect from X is dropped there
+  assign e_take = e_have && !s_valid;
   assign e_insn = e_c ? (e_rvc_ill ? 32'h0 : e_rvc_x) : win_data[31:0];
   assign e_raw  = e_c ? {16'h0, win_data[15:0]} : win_data[31:0];
 
@@ -771,29 +781,30 @@ module legend64 #(
   assign d_redirect = e_take && e_pnpc != e_seq;
 
   // ------------------------------------------------------------------ F: fetch address and translation
-  logic        any_redirect, x_redir_slow, slot_free, want_fetch, i_xlate, i_noncanon, itlb_hit, i_perm_ok,
+  logic        any_redirect, slot_free, want_fetch, i_xlate, i_noncanon, itlb_hit, i_perm_ok,
                i_fault_now, i_need_walk, fetch_issue, fault_issue;
   logic [2:0]  cnt_next;
-  logic [63:0] fetch_va, fetch_pa;
+  logic [63:0] fetch_va, issue_va, fetch_pa;
   logic [43:0] itlb_ppn;
   logic [4:0]  itlb_perm;
 
-  // a redirect that changes privilege or translation state waits one cycle, so that the fetch
-  // is translated with the new state
-  assign x_redir_slow = x_redirect && (x_trap || x_refetch);
+  // A redirect from X waits one cycle: its target goes to f_pc and is fetched from there. So the
+  // address issued (issue_va) comes from D and F alone, a fetch after a change of privilege or
+  // translation state is translated with the new state, and X's late signals end in registers.
   assign any_redirect = x_redirect || d_redirect;
-  assign fetch_va     = x_redirect ? (x_trap ? trap_target : x_npc) : d_redirect ? e_pnpc : f_pc;
-  assign cnt_next     = any_redirect ? 3'd0 : win_cnt - (e_take ? {1'b0, e_len} : 3'd0);
+  assign issue_va     = d_redirect ? e_pnpc : f_pc;
+  assign fetch_va     = x_redirect ? (x_trap ? trap_target : x_npc) : issue_va;
+  assign cnt_next     = d_redirect ? 3'd0 : win_cnt - (e_take ? {1'b0, e_len} : 3'd0);
   assign slot_free    = !pend_fetch || pend_fault || imem_rvalid;
-  assign want_fetch   = slot_free && cnt_next <= 3'd2 && !x_redir_slow && (!f_halt || any_redirect);
+  assign want_fetch   = slot_free && cnt_next <= 3'd2 && (!f_halt || d_redirect) && !x_redirect;
 
-  assign fetch_vpn  = fetch_va[38:12];
+  assign fetch_vpn  = issue_va[38:12];
   assign i_xlate    = satp_sv39 && priv != PRV_M;
-  assign i_noncanon = fetch_va[63:39] != {25{fetch_va[38]}};
+  assign i_noncanon = issue_va[63:39] != {25{issue_va[38]}};
   assign i_perm_ok  = itlb_perm[2] && (priv == PRV_U ? itlb_perm[3] : !itlb_perm[3]);
   assign i_fault_now = i_xlate && (i_noncanon || (itlb_hit && !i_perm_ok) || (iptw_fault && iptw_fault_vpn == fetch_vpn));
   assign i_need_walk = i_xlate && !i_noncanon && !itlb_hit && !(iptw_fault && iptw_fault_vpn == fetch_vpn);
-  assign fetch_pa    = i_xlate ? {8'b0, itlb_ppn, fetch_va[11:2], 2'b00} : {fetch_va[63:2], 2'b00};
+  assign fetch_pa    = i_xlate ? {8'b0, itlb_ppn, issue_va[11:2], 2'b00} : {issue_va[63:2], 2'b00};
 
   legend64_tlb #(.N(TLB_ENTRIES)) u_itlb (
       .clk, .flush(tlb_flush), .vpn(fetch_vpn), .hit(itlb_hit), .ppn(itlb_ppn), .perm(itlb_perm),
@@ -853,7 +864,7 @@ module legend64 #(
     if (!rst_n) begin
       f_pc <= RESET_PC; buf_pc <= RESET_PC; buf_cnt <= '0; buf_flt <= '0; f_halt <= 1'b0;
       pend_fetch <= 1'b0; pend_kill <= 1'b0; pend_fault <= 1'b0; pend_skip <= 1'b0;
-      ir_valid <= 1'b0;
+      ir_valid <= 1'b0; s_valid <= 1'b0;
       x_state <= X_IDLE;
       m_valid <= 1'b0; m_wen <= 1'b0; m_fwen <= 1'b0; m_load <= 1'b0;
       ptw_state <= P_IDLE; ptw_kill <= 1'b0; ptw_for_i <= 1'b0; iptw_fault <= 1'b0; d_ptw_fault <= 1'b0;
@@ -875,6 +886,7 @@ module legend64 #(
       // walker: nothing reads them before they are loaded, but none is left without a value
       buf_data <= '0;
       ir <= '0; ir_raw <= '0; ir_c <= 1'b0; ir_flt <= '0; ir_pc <= '0; ir_pnpc <= '0;
+      s_ir <= '0; s_raw <= '0; s_c <= 1'b0; s_flt <= '0; s_pc <= '0; s_pnpc <= '0;
       m_rd <= '0; m_val <= '0; m_pc <= '0; m_insn <= '0; m_f3 <= '0; m_off <= '0; m_box <= 1'b0;
       amo_data <= '0; amo_paddr <= '0; resv_addr <= '0;
       div_rem <= '0; div_quo <= '0; div_den <= '0; div_cnt <= '0; div_neg_q <= 1'b0; div_neg_r <= 1'b0;
@@ -882,8 +894,8 @@ module legend64 #(
     end else begin
       // ---- fetch
       if (fetch_issue || fault_issue) begin
-        pend_fetch <= 1'b1; pend_kill <= 1'b0; pend_fault <= fault_issue; pend_skip <= fetch_va[1];
-        f_pc <= {fetch_va[63:2], 2'b00} + 64'd4;
+        pend_fetch <= 1'b1; pend_kill <= 1'b0; pend_fault <= fault_issue; pend_skip <= issue_va[1];
+        f_pc <= {issue_va[63:2], 2'b00} + 64'd4;
       end else begin
         if (pend_fault || imem_rvalid) begin pend_fetch <= 1'b0; pend_kill <= 1'b0; pend_fault <= 1'b0; end
         else if (any_redirect && pend_fetch) pend_kill <= 1'b1;
@@ -910,11 +922,22 @@ module legend64 #(
       end
 
       // ---- instruction register
-      if (x_redirect) ir_valid <= 1'b0;
-      else if (!ir_stays) begin
-        ir_valid <= e_take;
-        ir <= e_insn; ir_raw <= e_raw; ir_c <= e_c; ir_flt <= e_flt;
-        ir_pc <= buf_pc; ir_pnpc <= e_pnpc;
+      if (x_redirect) begin
+        ir_valid <= 1'b0; s_valid <= 1'b0;
+      end else if (!ir_stays) begin
+        if (s_valid) begin
+          ir_valid <= 1'b1; s_valid <= 1'b0;
+          ir <= s_ir; ir_raw <= s_raw; ir_c <= s_c; ir_flt <= s_flt;
+          ir_pc <= s_pc; ir_pnpc <= s_pnpc;
+        end else begin
+          ir_valid <= e_take;
+          ir <= e_insn; ir_raw <= e_raw; ir_c <= e_c; ir_flt <= e_flt;
+          ir_pc <= buf_pc; ir_pnpc <= e_pnpc;
+        end
+      end else if (e_take) begin
+        s_valid <= 1'b1;
+        s_ir <= e_insn; s_raw <= e_raw; s_c <= e_c; s_flt <= e_flt;
+        s_pc <= buf_pc; s_pnpc <= e_pnpc;
       end
 
       // ---- page-table walker
